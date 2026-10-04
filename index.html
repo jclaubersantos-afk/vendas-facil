@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0f766e">
 <meta name="description" content="Controle simples de produtos, estoque, clientes e vendas.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="theme-color" content="#0f766e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vendas Fácil">
 <title>Vendas Fácil — Gestão de Estoque e Vendas</title>
 <style>
 :root{--green:#0f766e;--green-dark:#0b5e57;--green-light:#e6f4f2;--bg:#f4f7f7;--surface:#fff;--text:#0f2b2a;--muted:#5f7a78;--line:#e2eceb;--red:#b42318;--red-light:#fef3f2;--amber:#b45309;--amber-light:#fffbeb;--shadow:0 1px 2px rgba(15,43,42,.04),0 8px 24px rgba(15,43,42,.06);--radius:14px;--radius-sm:10px}
@@ -143,6 +151,13 @@ function bind(){document.querySelectorAll('.tab').forEach(button=>button.addEven
 function init(){db=readDb();$('saleDate').value=localDate();$('reportMonth').value=monthNow();bind();renderAll()}
 init();
 })();
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
