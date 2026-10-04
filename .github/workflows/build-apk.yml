@@ -1,0 +1,54 @@
+name: Build Vendas Facil APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android-project.zip'
+      - '.github/workflows/build-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Unpack Android project
+        run: unzip -q android-project.zip -d android
+
+      - name: Build installable debug APK
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK as GitHub release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vendas-facil-apk-1.0.0
+          name: Vendas Fácil APK 1.0.0
+          body: APK de instalação direta para Android. O app abre o Vendas Fácil publicado no GitHub Pages.
+          prerelease: true
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
