@@ -80,7 +80,7 @@
       <button id="saveSale" type="button" class="btn block">✅ Confirmar venda e baixar estoque</button>
       <p class="hint info" style="margin-top:12px">Adicione um ou mais produtos antes de confirmar. O estoque de todos os itens será baixado junto.</p>
     </div>
-    <div class="card"><h2>Vendas do dia <span class="badge" id="recentCount">0</span></h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Cliente</th><th>Produto(s)</th><th>Quantidade</th><th>Pagamento</th><th>Valor total</th><th>Ação</th></tr></thead><tbody id="recentSales"></tbody></table></div></div>
+    <div class="card"><h2>Vendas do dia <span class="badge" id="recentCount">0</span></h2><button id="shareDailyPdf" type="button" class="btn secondary block" style="margin:0 0 10px">📄 Compartilhar relatório do dia em PDF</button><div class="table-wrap"><table class="data-table"><thead><tr><th>Cliente</th><th>Produto(s)</th><th>Quantidade</th><th>Pagamento</th><th>Valor total</th><th>Ação</th></tr></thead><tbody id="recentSales"></tbody></table></div></div>
   </section>
   <section id="produtos" class="panel">
     <div class="card">
@@ -276,6 +276,73 @@ function exportReport(){
   const lines=[header,...rows.map(s=>[dateLabel(s.date),s.customerName,customerById(s.customerId)?.phone||'',saleItemsLabel(s),s.quantity,s.paymentMethod||'Dinheiro',num(s.pixAmount).toFixed(2).replace('.',','),num(s.cashAmount).toFixed(2).replace('.',','),s.total.toFixed(2).replace('.',','),s.note])];
   const csv='\ufeff'+lines.map(row=>row.map(csvCell).join(';')).join('\r\n');download(`relatorio-vendas-${$('reportMonth').value||'todos'}.csv`,csv,'text/csv;charset=utf-8');notify('Relatório CSV exportado.');
 }
+function cp1252Byte(character){
+  const code=character.charCodeAt(0);if(code<=255)return code;
+  const map={'€':128,'‚':130,'ƒ':131,'„':132,'…':133,'†':134,'‡':135,'ˆ':136,'‰':137,'Š':138,'‹':139,'Œ':140,'Ž':142,'‘':145,'’':146,'“':147,'”':148,'•':149,'–':150,'—':151,'˜':152,'™':153,'š':154,'›':155,'œ':156,'ž':158,'Ÿ':159};return map[character]??63;
+}
+function pdfHex(value){return Array.from(String(value)).map(character=>cp1252Byte(character).toString(16).padStart(2,'0')).join('').toUpperCase()}
+function wrapPdfText(value,max=88){
+  const words=String(value).split(/\s+/),lines=[];let line='';
+  words.forEach(word=>{if(!word)return;while(word.length>max){if(line){lines.push(line);line=''}lines.push(word.slice(0,max));word=word.slice(max)}if(line&&line.length+1+word.length>max){lines.push(line);line=word}else line=line?`${line} ${word}`:word});
+  if(line)lines.push(line);return lines.length?lines:[''];
+}
+function dailyReportLines(sales){
+  const units=sales.reduce((sum,sale)=>sum+sale.quantity,0),total=sales.reduce((sum,sale)=>sum+num(sale.total),0),lines=[];
+  lines.push({text:'Vendas Fácil — Relatório de vendas do dia',bold:true,size:16,leading:23});
+  lines.push({text:`Data: ${dateLabel(localDate())}    Emitido: ${new Date().toLocaleString('pt-BR')}`,leading:17});
+  lines.push({text:`${sales.length} venda(s) • ${units} unidade(s) • Total geral: ${money.format(total)}`,bold:true,leading:20});
+  lines.push({text:'',leading:8});
+  if(!sales.length){lines.push({text:'Nenhuma venda registrada nesta data.'});return lines}
+  sales.forEach((sale,index)=>{
+    lines.push({text:`Pedido ${index+1} — ${sale.customerName||'Consumidor não identificado'}`,bold:true,leading:16});
+    const items=Array.isArray(sale.items)&&sale.items.length?sale.items:[{productName:sale.productName,quantity:sale.quantity,unitPrice:sale.unitPrice,total:sale.total}];
+    items.forEach(item=>{
+      const description=`  • ${item.productName} — ${item.quantity} x ${money.format(item.unitPrice)} = ${money.format(item.total)}`;
+      wrapPdfText(description,88).forEach(text=>lines.push({text,leading:14}));
+    });
+    wrapPdfText(`  Pagamento: ${salePaymentLabel(sale)} | Total do pedido: ${money.format(sale.total)}`,88).forEach(text=>lines.push({text,bold:true,leading:15}));
+    if(sale.note)wrapPdfText(`  Observação: ${sale.note}`,88).forEach(text=>lines.push({text,leading:14}));
+    lines.push({text:'',leading:8});
+  });
+  return lines;
+}
+function dailyPdfBlob(sales){
+  const reportLines=dailyReportLines(sales),pageContents=[];let content='',y=790;
+  reportLines.forEach(line=>{
+    const size=line.size||10,leading=line.leading||14;
+    if(y<48){pageContents.push(content);content='';y=790}
+    if(line.text)content+=`BT /${line.bold?'F2':'F1'} ${size} Tf 48 ${y} Td <${pdfHex(line.text)}> Tj ET\n`;
+    y-=leading;
+  });
+  if(content||!pageContents.length)pageContents.push(content);
+  const pageCount=pageContents.length,fontRegularId=3+pageCount*2,fontBoldId=fontRegularId+1,objects=new Array(fontBoldId+1);
+  objects[1]='<< /Type /Catalog /Pages 2 0 R >>';
+  objects[2]=`<< /Type /Pages /Kids [${pageContents.map((_,index)=>`${3+index*2} 0 R`).join(' ')}] /Count ${pageCount} >>`;
+  objects[fontRegularId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  objects[fontBoldId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  pageContents.forEach((pageContent,index)=>{
+    const pageId=3+index*2,streamId=pageId+1;
+    objects[streamId]=`<< /Length ${pageContent.length} >>\nstream\n${pageContent}endstream`;
+    objects[pageId]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${streamId} 0 R >>`;
+  });
+  let pdf='%PDF-1.4\n';const offsets=new Array(objects.length).fill(0);
+  for(let id=1;id<objects.length;id++){offsets[id]=pdf.length;pdf+=`${id} 0 obj\n${objects[id]}\nendobj\n`}
+  const xref=pdf.length;pdf+=`xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for(let id=1;id<objects.length;id++)pdf+=`${String(offsets[id]).padStart(10,'0')} 00000 n \n`;
+  pdf+=`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new Blob([pdf],{type:'application/pdf'});
+}
+async function shareDailyPdf(){
+  const today=localDate(),sales=db.sales.filter(s=>s.date===today).slice().sort((a,b)=>text(a.createdAt||a.date).localeCompare(text(b.createdAt||b.date)));
+  const filename=`vendas-do-dia-${today}.pdf`,file=new File([dailyPdfBlob(sales)],filename,{type:'application/pdf'});
+  let canShareFile=typeof navigator.share==='function';
+  try{if(canShareFile&&typeof navigator.canShare==='function')canShareFile=navigator.canShare({files:[file]})}catch(error){canShareFile=false}
+  if(canShareFile){
+    try{await navigator.share({files:[file],title:'Relatório de vendas do dia',text:`Relatório de vendas de ${dateLabel(today)}. Escolha WhatsApp para compartilhar.`});notify('Escolha o WhatsApp na lista de compartilhamento.');return}
+    catch(error){if(error.name==='AbortError')return;console.warn('Compartilhamento indisponível.',error)}
+  }
+  download(filename,file,'application/pdf');notify('PDF baixado. Abra o arquivo e escolha Compartilhar → WhatsApp.');
+}
 async function importBackup(){const file=$('importFile').files[0];if(!file){notify('Escolha um arquivo JSON primeiro.','error');return}try{const raw=JSON.parse(await file.text());const data=raw.data&&typeof raw.data==='object'?raw.data:raw;const next=normalizeDb(data);if(!confirm(`Importar ${next.products.length} produto(s), ${next.customers.length} cliente(s) e ${next.sales.length} venda(s)? Os dados atuais serão substituídos.`))return;if(!persist(next))return;db=next;renderAll();clearCustomerForm();clearProductForm();$('importFile').value='';notify('Backup restaurado com sucesso.')}catch(error){console.error(error);notify('Arquivo inválido ou incompatível. Nenhum dado foi alterado.','error')}}
 function clearAll(){if(!confirm('Apagar todos os produtos, clientes e vendas deste aparelho? Esta ação não pode ser desfeita.'))return;if(!persist(emptyDb()))return;db=emptyDb();saleCart=[];clearProductForm();clearCustomerForm();$('saleQty').value='1';$('salePrice').value='';$('saleNote').value='';$('pixAmount').value='';$('salePaymentMethod').value='dinheiro';renderAll();notify('Todos os dados foram apagados.')}
 function locateCustomer(){const status=$('geoStatus');if(!navigator.geolocation){status.textContent='Este navegador não oferece localização.';return}status.textContent='Solicitando acesso à localização…';navigator.geolocation.getCurrentPosition(pos=>{const lat=pos.coords.latitude.toFixed(6),lng=pos.coords.longitude.toFixed(6);$('customerCoords').value=`${lat},${lng}`;status.textContent='Localização salva neste cadastro. Salve o cliente para guardar os dados.'},err=>{status.textContent=err.code===1?'Permissão de localização negada. Autorize no navegador e tente de novo.':'Não foi possível obter a localização. Confira o GPS e tente novamente.'},{enableHighAccuracy:true,timeout:12000,maximumAge:60000})}
@@ -308,7 +375,7 @@ function bind(){
   $('themeToggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark',true));
   $('saveProduct').addEventListener('click',saveProduct);$('cancelProductEdit').addEventListener('click',clearProductForm);
   $('saveCustomer').addEventListener('click',saveCustomer);$('cancelCustomerEdit').addEventListener('click',clearCustomerForm);
-  $('saveSale').addEventListener('click',saveSale);$('addSaleItem').addEventListener('click',addSaleItem);
+  $('saveSale').addEventListener('click',saveSale);$('addSaleItem').addEventListener('click',addSaleItem);$('shareDailyPdf').addEventListener('click',shareDailyPdf);
   $('saleQty').addEventListener('input',updateSaleTotal);$('salePrice').addEventListener('input',updateSaleTotal);$('salePaymentMethod').addEventListener('change',updateSaleTotal);$('pixAmount').addEventListener('input',updateSaleTotal);
   $('saleProduct').addEventListener('change',()=>{const p=productById($('saleProduct').value);$('salePrice').value=p?Number(p.price).toFixed(2):'';updateSaleTotal()});
   $('dashProduct').addEventListener('change',renderDashboard);$('productSearch').addEventListener('input',renderProducts);$('customerSearch').addEventListener('input',renderCustomers);
