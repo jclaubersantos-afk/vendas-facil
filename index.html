@@ -121,7 +121,7 @@
     <div class="card"><h2>Resumo do estoque</h2><div id="stockSummary"></div></div>
   </section>
   <section id="dados" class="panel">
-    <div class="card"><h2>Backup dos dados</h2><p class="hint">Os dados ficam armazenados localmente neste navegador/celular. Exporte uma cópia regularmente para não perder cadastros e vendas.</p><button type="button" id="exportBackup" class="btn block" style="margin-top:12px">⬇️ Exportar backup completo</button><div class="field" style="margin-top:14px"><label for="importFile">Restaurar backup (JSON)</label><input id="importFile" type="file" accept=".json,application/json"></div><button type="button" id="importBackup" class="btn secondary block">Importar backup selecionado</button><p class="hint" style="margin-top:8px">Importar backup substitui os dados atuais. Guarde o arquivo exportado em local seguro.</p><hr><h2>Como abrir o Google Maps</h2><p class="hint">Use “Mapa” no cadastro do cliente. Se houver coordenadas salvas, o mapa abre naquele ponto; caso contrário, pesquisa pelo endereço.</p><button type="button" id="clearAll" class="btn danger block" style="margin-top:12px">🗑️ Apagar todos os dados</button></div>
+    <div class="card"><h2>Backup dos dados</h2><p class="hint">Os dados ficam armazenados localmente neste navegador/celular. Exporte uma cópia regularmente para não perder cadastros e vendas.</p><button type="button" id="exportBackup" class="btn block" style="margin-top:12px">⬇️ Exportar backup completo</button><div class="field" style="margin-top:14px"><label for="importFile">Restaurar backup (JSON)</label><input id="importFile" type="file" accept=".json,application/json"></div><button type="button" id="importBackup" class="btn secondary block">Importar backup selecionado</button><button type="button" id="prepareBackupText" class="btn secondary block" style="margin-top:10px">📋 Preparar cópia de segurança em texto</button><div id="backupTextWrap" style="display:none;margin-top:10px"><p class="hint">Copie o texto e guarde numa nota segura antes de reinstalar o app. Depois, cole-o aqui para restaurar os dados.</p><div class="field"><label for="backupText">Backup em texto</label><textarea id="backupText" rows="7" placeholder="Toque em “Preparar cópia…” ou cole aqui seu backup"></textarea></div><button type="button" id="restoreBackupText" class="btn secondary block">Restaurar backup colado</button></div><p class="hint" style="margin-top:8px">Importar backup substitui os dados atuais. Guarde o arquivo exportado em local seguro.</p><hr><h2>Como abrir o Google Maps</h2><p class="hint">Use “Mapa” no cadastro do cliente. Se houver coordenadas salvas, o mapa abre naquele ponto; caso contrário, pesquisa pelo endereço.</p><button type="button" id="clearAll" class="btn danger block" style="margin-top:12px">🗑️ Apagar todos os dados</button></div>
   </section>
 </main>
 <div class="bottomnote">Vendas Fácil • funciona sem internet para cadastros e vendas. Maps exige conexão.</div><div id="toast" role="status" aria-live="polite"></div>
@@ -272,13 +272,21 @@ function saveSale(){
   if(commit(d=>{for(const [productId,amount] of Object.entries(required)){const product=d.products.find(p=>p.id===productId);product.stock-=amount}d.sales.push(sale)},'Venda registrada; estoque atualizado.')){saleCart=[];$('saleQty').value='1';$('saleNote').value='';$('saleDate').value=localDate();$('salePaymentMethod').value='dinheiro';$('pixAmount').value='';renderSaleCart();updateSaleTotal()}
 }
 function csvCell(value){return `"${text(value).replaceAll('"','""')}"`}
-function download(filename,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-function exportBackup(){const payload={app:'Vendas Fácil',schemaVersion:2,exportedAt:new Date().toISOString(),...db};download(`vendas-facil-backup-${localDate()}.json`,JSON.stringify(payload,null,2),'application/json;charset=utf-8');notify('Backup exportado.')}
+async function blobToBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let offset=0;offset<bytes.length;offset+=0x8000)binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+0x8000,bytes.length)));return btoa(binary)}
+function shareWithAndroid(blob,filename,mimeType,title,caption=''){
+  if(!window.AndroidShare||typeof window.AndroidShare.shareFile!=='function')return false;
+  blobToBase64(blob).then(base64=>window.AndroidShare.shareFile(base64,filename,mimeType,title,caption)).catch(error=>{console.error(error);notify('Não consegui preparar o arquivo para compartilhar.','error')});return true;
+}
+function download(filename,content,type){const blob=new Blob([content],{type});if(shareWithAndroid(blob,filename,type,filename,'')){notify('Escolha onde salvar ou compartilhar o arquivo.');return true}if(window.AndroidContacts){notify('Esta versão do app não consegue salvar arquivos. Atualize o Vendas Fácil para exportar ou compartilhar.','error');return false}const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('Download solicitado. Confira a pasta Downloads.');return true}
+function backupJson(){return JSON.stringify({app:'Vendas Fácil',schemaVersion:2,exportedAt:new Date().toISOString(),...db},null,2)}
+function exportBackup(){download(`vendas-facil-backup-${localDate()}.json`,backupJson(),'application/json;charset=utf-8')}
+function prepareBackupText(){const area=$('backupText');area.value=backupJson();$('backupTextWrap').style.display='block';area.focus();area.select();let copied=false;try{copied=document.execCommand('copy')}catch(error){}notify(copied?'Backup copiado. Cole-o e salve em uma nota segura.':'Backup pronto. Selecione e copie o texto para uma nota segura.')}
+function restoreBackupText(){const value=$('backupText').value.trim();if(!value){notify('Cole o backup no campo antes de restaurar.','error');return}try{const next=normalizeDb(JSON.parse(value));if(!confirm(`Restaurar ${next.products.length} produto(s), ${next.customers.length} cliente(s) e ${next.sales.length} venda(s)? Os dados atuais serão substituídos.`))return;if(!persist(next))return;db=next;renderAll();clearCustomerForm();clearProductForm();notify('Backup restaurado com sucesso.')}catch(error){notify('Texto inválido ou incompatível. Nenhum dado foi alterado.','error')}}
 function exportReport(){
   const rows=filteredReportSales();if(!rows.length){notify('Não há vendas neste filtro para exportar.','error');return}
   const header=['Data','Cliente','Telefone','Produto(s)','Quantidade total','Pagamento','Valor Pix','Valor em dinheiro','Total','Observação'];
   const lines=[header,...rows.map(s=>[dateLabel(s.date),s.customerName,customerById(s.customerId)?.phone||'',saleItemsLabel(s),s.quantity,s.paymentMethod||'Dinheiro',num(s.pixAmount).toFixed(2).replace('.',','),num(s.cashAmount).toFixed(2).replace('.',','),s.total.toFixed(2).replace('.',','),s.note])];
-  const csv='\ufeff'+lines.map(row=>row.map(csvCell).join(';')).join('\r\n');download(`relatorio-vendas-${$('reportMonth').value||'todos'}.csv`,csv,'text/csv;charset=utf-8');notify('Relatório CSV exportado.');
+  const csv='\ufeff'+lines.map(row=>row.map(csvCell).join(';')).join('\r\n');download(`relatorio-vendas-${$('reportMonth').value||'todos'}.csv`,csv,'text/csv;charset=utf-8');
 }
 function cp1252Byte(character){
   const code=character.charCodeAt(0);if(code<=255)return code;
@@ -338,14 +346,16 @@ function dailyPdfBlob(sales){
 }
 async function shareDailyPdf(){
   const today=localDate(),sales=db.sales.filter(s=>s.date===today).slice().sort((a,b)=>text(a.createdAt||a.date).localeCompare(text(b.createdAt||b.date)));
-  const filename=`vendas-do-dia-${today}.pdf`,file=new File([dailyPdfBlob(sales)],filename,{type:'application/pdf'});
+  const filename=`vendas-do-dia-${today}.pdf`,caption=`Relatório de vendas de ${dateLabel(today)}.`,file=new File([dailyPdfBlob(sales)],filename,{type:'application/pdf'});
+  if(shareWithAndroid(file,filename,'application/pdf','Relatório de vendas do dia',caption)){notify('Escolha WhatsApp ou outro app para compartilhar o PDF.');return}
   let canShareFile=typeof navigator.share==='function';
   try{if(canShareFile&&typeof navigator.canShare==='function')canShareFile=navigator.canShare({files:[file]})}catch(error){canShareFile=false}
   if(canShareFile){
-    try{await navigator.share({files:[file],title:'Relatório de vendas do dia',text:`Relatório de vendas de ${dateLabel(today)}. Escolha WhatsApp para compartilhar.`});notify('Escolha o WhatsApp na lista de compartilhamento.');return}
+    try{await navigator.share({files:[file],title:'Relatório de vendas do dia',text:caption+' Escolha WhatsApp para compartilhar.'});notify('Escolha o WhatsApp na lista de compartilhamento.');return}
     catch(error){if(error.name==='AbortError')return;console.warn('Compartilhamento indisponível.',error)}
   }
-  download(filename,file,'application/pdf');notify('PDF baixado. Abra o arquivo e escolha Compartilhar → WhatsApp.');
+  if(window.AndroidContacts){notify('Esta versão do app não consegue salvar o PDF. Atualize o Vendas Fácil para compartilhar pelo WhatsApp.','error');return}
+  download(filename,file,'application/pdf');
 }
 async function importBackup(){const file=$('importFile').files[0];if(!file){notify('Escolha um arquivo JSON primeiro.','error');return}try{const raw=JSON.parse(await file.text());const data=raw.data&&typeof raw.data==='object'?raw.data:raw;const next=normalizeDb(data);if(!confirm(`Importar ${next.products.length} produto(s), ${next.customers.length} cliente(s) e ${next.sales.length} venda(s)? Os dados atuais serão substituídos.`))return;if(!persist(next))return;db=next;renderAll();clearCustomerForm();clearProductForm();$('importFile').value='';notify('Backup restaurado com sucesso.')}catch(error){console.error(error);notify('Arquivo inválido ou incompatível. Nenhum dado foi alterado.','error')}}
 function clearAll(){if(!confirm('Apagar todos os produtos, clientes e vendas deste aparelho? Esta ação não pode ser desfeita.'))return;if(!persist(emptyDb()))return;db=emptyDb();saleCart=[];clearProductForm();clearCustomerForm();$('saleQty').value='1';$('salePrice').value='';$('saleNote').value='';$('pixAmount').value='';$('salePaymentMethod').value='dinheiro';renderAll();notify('Todos os dados foram apagados.')}
@@ -354,6 +364,7 @@ function applyContact(c){if(!c)return;const name=Array.isArray(c.name)?c.name[0]
 window.onAndroidContactSelected=applyContact;
 window.onAndroidContactCancelled=function(){};
 window.onAndroidContactError=function(){notify('Não foi possível abrir a agenda do aparelho. Digite o nome e telefone manualmente.','error')};
+window.onAndroidShareError=function(){notify('Não consegui abrir o compartilhamento do arquivo.','error')};
 async function importContacts(){if(window.AndroidContacts&&typeof window.AndroidContacts.pickContact==='function'){window.AndroidContacts.pickContact();return}if(!navigator.contacts||typeof navigator.contacts.select!=='function'){notify('Este navegador não oferece acesso à agenda. Digite o nome e telefone manualmente ou use o app Vendas Fácil.','error');return}try{const selected=await navigator.contacts.select(['name','tel'],{multiple:true});contacts=selected.map(c=>({name:Array.isArray(c.name)?c.name[0]:c.name,phone:Array.isArray(c.tel)?c.tel[0]:c.tel})).filter(c=>c.name||c.phone);if(!contacts.length){notify('Nenhum contato selecionado.','error');return}const select=$('contactPicker');select.replaceChildren();contacts.forEach((c,i)=>addOption(select,String(i),`${c.name||'Sem nome'}${c.phone?` — ${c.phone}`:''}`));$('contactPickerWrap').style.display='block';notify('Escolha um contato e toque em “Usar contato”.')}catch(error){if(error.name!=='AbortError')notify('Não foi possível acessar a agenda neste navegador. Digite o nome e telefone manualmente.','error')}}
 function useContact(){const c=contacts[Number($('contactPicker').value)];if(!c)return;applyContact(c)}
 function normalizeContactName(value){return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR')}
@@ -384,7 +395,7 @@ function bind(){
   $('saleProduct').addEventListener('change',()=>{const p=productById($('saleProduct').value);$('salePrice').value=p?Number(p.price).toFixed(2):'';updateSaleTotal()});
   $('dashProduct').addEventListener('change',renderDashboard);$('productSearch').addEventListener('input',renderProducts);$('customerSearch').addEventListener('input',renderCustomers);
   $('reportMonth').addEventListener('change',renderReports);$('reportCustomer').addEventListener('change',renderReports);
-  $('exportBackup').addEventListener('click',exportBackup);$('importBackup').addEventListener('click',importBackup);$('exportReport').addEventListener('click',exportReport);$('clearAll').addEventListener('click',clearAll);
+  $('exportBackup').addEventListener('click',exportBackup);$('importBackup').addEventListener('click',importBackup);$('prepareBackupText').addEventListener('click',prepareBackupText);$('restoreBackupText').addEventListener('click',restoreBackupText);$('exportReport').addEventListener('click',exportReport);$('clearAll').addEventListener('click',clearAll);
   $('locateCustomer').addEventListener('click',locateCustomer);$('importContacts').addEventListener('click',importContacts);$('useContact').addEventListener('click',useContact);$('importManyContacts').addEventListener('click',importManyContacts);
   $('bulkContactSearch').addEventListener('input',renderBulkContacts);$('selectAllBulkContacts').addEventListener('click',()=>selectVisibleBulkContacts(true));$('clearBulkContactSelection').addEventListener('click',()=>selectVisibleBulkContacts(false));$('registerSelectedContacts').addEventListener('click',registerSelectedContacts);$('cancelBulkContacts').addEventListener('click',cancelBulkContacts);
 }
