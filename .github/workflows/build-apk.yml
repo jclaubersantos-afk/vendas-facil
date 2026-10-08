@@ -46,9 +46,9 @@ jobs:
       - name: Upload APK as GitHub release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vendas-facil-apk-1.0.3
-          name: Vendas Fácil APK 1.0.3
-          body: APK Android com compartilhamento nativo de PDFs e backups. O app abre o Vendas Fácil publicado no GitHub Pages.
+          tag_name: vendas-facil-apk-1.0.4
+          name: Vendas Fácil APK 1.0.4
+          body: APK Android atualizado para a versão 1.0.4. O app abre o Vendas Fácil no GitHub Pages, com o modo escuro fixo, indicadores de vendas e ajuste de estoque atualizado.
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
