@@ -46,9 +46,9 @@ jobs:
       - name: Upload APK as GitHub release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vendas-facil-apk-1.0.5
-          name: Vendas Fácil APK 1.0.5
-          body: APK Android versão 1.0.5. O painel fixo acompanha Água 20lts e as vendas baixam o estoque de todos os produtos. O app abre o Vendas Fácil publicado no GitHub Pages.
+          tag_name: vendas-facil-apk-1.0.6
+          name: Vendas Fácil APK 1.0.6
+          body: APK Android versão 1.0.6 com cadastro de despesas, fechamento diário do caixa em PDF e campos mais compactos. O app abre o Vendas Fácil publicado no GitHub Pages.
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
