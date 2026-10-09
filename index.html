@@ -265,7 +265,7 @@ function renderExpenses(){
   if(!expenses.length){const row=make('tr'),cell=make('td','empty','As despesas registradas aparecerão aqui.');cell.colSpan=4;row.append(cell);rows.append(row);return}
   expenses.forEach(expense=>{const row=make('tr'),typeCell=make('td','',expense.type),actionCell=make('td'),actions=make('div','expense-actions'),edit=make('button','btn secondary smallbtn','Editar'),del=make('button','btn danger smallbtn','Excluir');edit.type='button';edit.addEventListener('click',()=>editExpense(expense.id));del.type='button';del.addEventListener('click',()=>deleteExpense(expense.id));actions.append(edit,del);actionCell.append(actions);row.append(make('td','',dateLabel(expense.date)),typeCell,make('td','money-cell',money.format(expense.amount)),actionCell);rows.append(row)});
 }
-function renderReports(){"});
+function renderReports(){
   const sales=filteredReportSales(),sum=sales.reduce((n,s)=>n+num(s.total),0),units=sales.reduce((n,s)=>n+s.quantity,0);
   const summary=$('reportSummary');summary.replaceChildren();const top=make('div','reportline');top.append(make('span','label',`${sales.length} venda(s) • ${units} unidade(s)`),make('strong','',money.format(sum)));summary.append(top);
   const box=$('reportRows');box.replaceChildren();if(!sales.length){addEmpty(box,'Nenhuma venda encontrada para este filtro.');return}
