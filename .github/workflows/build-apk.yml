@@ -16,6 +16,17 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Check embedded JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('No embedded scripts found');
+          scripts.forEach((match, index) => new Function(match[1]));
+          console.log(`Validated ${scripts.length} embedded scripts`);
+          NODE
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -46,9 +57,9 @@ jobs:
       - name: Upload APK as GitHub release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vendas-facil-apk-1.0.6
-          name: Vendas Fácil APK 1.0.6
-          body: APK Android versão 1.0.6 com cadastro de despesas, fechamento diário do caixa em PDF e campos mais compactos. O app abre o Vendas Fácil publicado no GitHub Pages.
+          tag_name: vendas-facil-apk-1.0.7
+          name: Vendas Fácil APK 1.0.7
+          body: APK Android versão 1.0.7 com correção da inicialização JavaScript, cadastro de despesas, fechamento diário em PDF e campos compactos. O app abre o Vendas Fácil no GitHub Pages.
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
