@@ -423,13 +423,13 @@ function pdfTableRow(cells,options={}){
   return {tableRow:true,cells:normalized,header,shade:!!options.shade,boldCells:options.boldCells||[],boldLines:options.boldLines||[],widths:[132,130,55,182],lineHeight,fontSize,height};
 }
 function pdfTableRowContent(row,top){
-  const x0=48,width=row.widths.reduce((sum,value)=>sum+value,0),bottom=top-row.height,fill=row.header?'0.08 0.36 0.34':row.shade?'0.96 0.975 0.97':'1 1 1',border='0.76 0.82 0.80';
+  const x0=48,width=row.widths.reduce((sum,value)=>sum+value,0),bottom=top-row.height,fill=row.header?'0.08 0.32 0.30':row.shade?'0.13 0.18 0.18':'0.10 0.15 0.15',border='0.30 0.43 0.41';
   let content=`q ${fill} rg ${x0} ${bottom} ${width} ${row.height} re f Q\n`,x=x0;
   row.widths.forEach(cellWidth=>{content+=`q ${border} RG 0.45 w ${x} ${bottom} ${cellWidth} ${row.height} re S Q\n`;x+=cellWidth});
   x=x0;
   row.cells.forEach((cellLines,cellIndex)=>{
     cellLines.forEach((value,lineIndex)=>{
-      const valueText=String(value),approxWidth=valueText.length*row.fontSize*0.49,tx=cellIndex===2?x+Math.max(5,(row.widths[cellIndex]-approxWidth)/2):x+6,baseline=top-5-row.fontSize-lineIndex*row.lineHeight,bold=row.header||row.boldCells.includes(cellIndex)||(row.boldLines[cellIndex]||[]).includes(lineIndex),color=row.header?'1 1 1':'0.10 0.17 0.16';
+      const valueText=String(value),approxWidth=valueText.length*row.fontSize*0.49,tx=cellIndex===2?x+Math.max(5,(row.widths[cellIndex]-approxWidth)/2):x+6,baseline=top-5-row.fontSize-lineIndex*row.lineHeight,bold=row.header||row.boldCells.includes(cellIndex)||(row.boldLines[cellIndex]||[]).includes(lineIndex),color=row.header?'1 1 1':'0.92 0.95 0.94';
       if(valueText)content+=`BT /${bold?'F2':'F1'} ${row.fontSize} Tf ${color} rg ${tx} ${baseline} Td <${pdfHex(valueText)}> Tj ET\n`;
     });
     x+=row.widths[cellIndex];
@@ -445,7 +445,7 @@ function pdfBlobFromLines(reportLines){
     }
     const size=line.size||10,leading=line.leading||14;
     if(y-leading<48){if(content)pageContents.push(content);content='';y=790}
-    if(line.text)content+=`BT /${line.bold?'F2':'F1'} ${size} Tf 48 ${y} Td <${pdfHex(line.text)}> Tj ET\n`;
+    if(line.text)content+=`BT /${line.bold?'F2':'F1'} ${size} Tf 0.92 0.95 0.94 rg 48 ${y} Td <${pdfHex(line.text)}> Tj ET\n`;
     y-=leading;
   });
   if(content||!pageContents.length)pageContents.push(content);
@@ -455,8 +455,8 @@ function pdfBlobFromLines(reportLines){
   objects[fontRegularId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
   objects[fontBoldId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
   pageContents.forEach((pageContent,index)=>{
-    const pageId=3+index*2,streamId=pageId+1;
-    objects[streamId]=`<< /Length ${pageContent.length} >>\nstream\n${pageContent}endstream`;
+    const pageId=3+index*2,streamId=pageId+1,pageStream=`q 0.06 0.08 0.08 rg 0 0 595 842 re f Q\n${pageContent}`;
+    objects[streamId]=`<< /Length ${pageStream.length} >>\nstream\n${pageStream}endstream`;
     objects[pageId]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${streamId} 0 R >>`;
   });
   let pdf='%PDF-1.4\n';const offsets=new Array(objects.length).fill(0);
