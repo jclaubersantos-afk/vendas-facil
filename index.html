@@ -544,25 +544,37 @@ function pdfBlobFromLines(reportLines){
   pdf+=`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return new Blob([pdf],{type:'application/pdf'});
 }
+function reportPdfSummaryLines(sales,summary){
+  const {saleCount,units,total,commission,hasUnrecorded}=summary,selectedProductId=reportMode==='product'?$('reportProduct').value:'',selectedProduct=productById(selectedProductId),groups=reportProductGroups(sales).filter(group=>!selectedProductId||group.key===selectedProductId||group.name===selectedProduct?.name),widths=[280,100,145],lines=[{text:'RESUMO DO RELATÓRIO',bold:true,leading:21},{text:`${reportModeLabel()} — ${reportFilterDescription()}`,leading:17},pdfTableRow([['Produto'],['Quantidade'],['Valor']],{header:true,widths})];
+  groups.forEach((group,index)=>lines.push(pdfTableRow([[group.name],[`${group.quantity} un.`],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
+  if(!groups.length)lines.push(pdfTableRow([['Nenhum produto'],['0 un.'],[money.format(0)]],{widths}));
+  lines.push({text:`${saleCount} venda(s) • ${units} unidade(s)`,bold:true,leading:18});
+  lines.push(pdfTableRow([['Total Vendas'],[''],[money.format(total)]],{widths,boldCells:[0,2]}),pdfTableRow([['Comissão calculada'],[''],[money.format(commission)]],{widths,boldCells:[0,2]}));
+  if(reportMode==='date'||reportMode==='month'){
+    const month=reportMode==='month'?$('reportMonth').value:'',expenses=db.expenses.filter(expense=>reportMode==='date'?expense.date===$('reportDate').value:(!month||saleMonth({date:expense.date})===month)),expenseTotal=Math.round(expenses.reduce((sum,expense)=>sum+num(expense.amount),0)*100)/100,pixSales=sales.filter(sale=>num(sale.pixAmount)>0),pixTotal=Math.round(sales.reduce((sum,sale)=>sum+num(sale.pixAmount),0)*100)/100,balance=Math.round((total-expenseTotal-pixTotal)*100)/100;
+    lines.push(pdfTableRow([['Despesas'],[''],[money.format(expenseTotal)]],{widths}),pdfTableRow([[`${pixSales.length} Pagto Pix`],[''],[money.format(pixTotal)]],{widths}),pdfTableRow([['Total Saldo'],[''],[money.format(balance)]],{widths,shade:true,boldCells:[0,2]}),{text:'Saldo = total de vendas − despesas − valores recebidos em Pix.',leading:16});
+  }else lines.push({text:'Despesas, Pix e saldo não são atribuídos a um cliente ou produto específico.',leading:16});
+  if(hasUnrecorded)lines.push({text:'Vendas anteriores sem comissão registrada não têm cálculo retroativo.',leading:16});
+  return lines;
+}
 function reportPdfLines(){
-  const sales=filteredReportSales(),isProduct=reportMode==='product',productId=isProduct?$('reportProduct').value:'',items=isProduct?matchedReportItems(sales,productId):[],saleCount=isProduct?new Set(items.map(row=>row.sale.id)).size:sales.length,units=isProduct?items.reduce((sum,row)=>sum+num(row.item.quantity),0):sales.reduce((sum,sale)=>sum+num(sale.quantity),0),total=Math.round((isProduct?items.reduce((sum,row)=>sum+num(row.item.total),0):sales.reduce((sum,sale)=>sum+num(sale.total),0))*100)/100,commission=Math.round((isProduct?items.reduce((sum,row)=>sum+commissionForItem(row.item),0):sales.reduce((sum,sale)=>sum+saleCommission(sale),0))*100)/100,hasUnrecorded=sales.some(sale=>saleItems(sale).some(item=>item.commissionPerUnit==null));
-  const lines=[{text:'Vendas Fácil — Relatório de vendas',bold:true,size:16,leading:24},{text:`Tipo: ${reportModeLabel()}`,bold:true,leading:18},{text:reportFilterDescription(),leading:18},{text:`Emitido: ${new Date().toLocaleString('pt-BR')}`,leading:17},{text:`${saleCount} venda(s) • ${units} unidade(s) • Total vendido: ${money.format(total)}`,bold:true,leading:20},{text:`Comissão calculada: ${money.format(commission)}`,bold:true,size:11,leading:17}];
-  if(hasUnrecorded)lines.push({text:'Vendas anteriores sem comissão registrada não têm cálculo retroativo.',leading:17});
-  lines.push({text:isProduct?'VENDAS POR PRODUTO':'MOVIMENTAÇÕES',bold:true,leading:19});
+  const sales=filteredReportSales(),isProduct=reportMode==='product',productId=isProduct?$('reportProduct').value:'',items=isProduct?matchedReportItems(sales,productId):[],saleCount=isProduct?new Set(items.map(row=>row.sale.id)).size:sales.length,units=isProduct?items.reduce((sum,row)=>sum+num(row.item.quantity),0):sales.reduce((sum,sale)=>sum+num(sale.quantity),0),total=Math.round((isProduct?items.reduce((sum,row)=>sum+num(row.item.total),0):sales.reduce((sum,sale)=>sum+num(sale.total),0))*100)/100,commission=Math.round((isProduct?items.reduce((sum,row)=>sum+commissionForItem(row.item),0):sales.reduce((sum,sale)=>sum+saleCommission(sale),0))*100)/100,hasUnrecorded=sales.some(sale=>saleItems(sale).some(item=>item.commissionPerUnit==null)),summary={saleCount,units,total,commission,hasUnrecorded};
+  const lines=[{text:'Relatório de Vendas',bold:true,size:16,leading:24}];
   if(!sales.length){lines.push({text:'Nenhuma venda encontrada para este filtro.',leading:18});return lines}
+  lines.push({text:isProduct?'VENDAS POR PRODUTO':'MOVIMENTAÇÕES',bold:true,leading:19});
   if(isProduct&&!productId){
     const widths=[210,72,65,152],groups=reportProductGroups(sales);lines.push(pdfTableRow([['Produto'],['Unidades'],['Vendas'],['Total / comissão']],{header:true,widths}));
     groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,36),[`${group.quantity} un.`],[String(group.sales)],[`Vendido: ${money.format(group.total)}`,`Comissão: ${money.format(group.commission)}`]],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[1]]})));
-    return lines;
+    lines.push(...reportPdfSummaryLines(sales,summary));return lines;
   }
   if(isProduct){
     const widths=[129,130,55,185];lines.push(pdfTableRow([['Data / cliente'],['Produto'],['Qtd.'],['Vendido / comissão']],{header:true,widths}));
     items.forEach(({sale,item},index)=>{const clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${sale.customerName||'Consumidor não identificado'}`,25),productLines=wrapPdfText(item.productName||'Produto removido',25),paymentLines=[`Vendido: ${money.format(item.total)}`,`Comissão: ${money.format(commissionForItem(item))}`];lines.push(pdfTableRow([clientLines,productLines,[`${item.quantity} un.`],paymentLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[1]]}))});
-    return lines;
+    lines.push(...reportPdfSummaryLines(sales,summary));return lines;
   }
   const widths=[132,130,55,182];lines.push(pdfTableRow([['Data / cliente'],['Produto(s)'],['Quantidade'],['Pagamento / comissão']],{header:true,widths}));
   sales.forEach((sale,index)=>{const code=saleCustomerCode(sale),clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,25),productLines=[],quantityLines=[],paymentLines=[];saleItems(sale).forEach(item=>wrapPdfText(item.productName||'Produto removido',24).forEach((part,lineIndex)=>{productLines.push(part);quantityLines.push(lineIndex===0?`${item.quantity} un.`:'' )}));if(num(sale.pixAmount)>0)paymentLines.push(...wrapPdfText(`Pix: ${money.format(sale.pixAmount)}`,30));if(num(sale.cashAmount)>0)paymentLines.push(...wrapPdfText(`Dinheiro: ${money.format(sale.cashAmount)}`,30));paymentLines.push(...wrapPdfText(`Total pago: ${money.format(num(sale.pixAmount)+num(sale.cashAmount))}`,30),`Comissão: ${money.format(saleCommission(sale))}`);lines.push(pdfTableRow([clientLines,productLines,quantityLines,paymentLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[paymentLines.length-1]]}))});
-  return lines;
+  lines.push(...reportPdfSummaryLines(sales,summary));return lines;
 }
 function reportPdfBlob(){return pdfBlobFromLines(reportPdfLines())}
 function dailyPdfBlob(sales){return pdfBlobFromLines(dailyReportLines(sales))}
