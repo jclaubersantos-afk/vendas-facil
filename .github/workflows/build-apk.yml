@@ -57,9 +57,9 @@ jobs:
       - name: Upload APK as GitHub release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vendas-facil-apk-1.0.8
-          name: Vendas Fácil APK 1.0.8
-          body: APK Android versão 1.0.8 com seletor nativo para restaurar backups JSON pelo Android. O app abre o Vendas Fácil no GitHub Pages.
+          tag_name: vendas-facil-apk-1.0.9
+          name: Vendas Fácil APK 1.0.9
+          body: APK Android versão 1.0.9 com notificações locais de vendas e estoque baixo, salvamento nativo de relatórios PDF em Downloads e seletor nativo para restaurar backups JSON. O app abre o Vendas Fácil no GitHub Pages.
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
