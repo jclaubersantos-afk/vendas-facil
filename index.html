@@ -554,14 +554,13 @@ function pdfBlobFromLines(reportLines){
   return new Blob([pdf],{type:'application/pdf'});
 }
 function reportPdfSummaryLines(sales,summary){
-  const {saleCount,units,total,commission,hasUnrecorded}=summary,selectedProductId=reportMode==='product'?$('reportProduct').value:'',selectedProduct=productById(selectedProductId),groups=reportProductGroups(sales).filter(group=>!selectedProductId||group.key===selectedProductId||group.name===selectedProduct?.name),widths=[280,100,145],lines=[{text:'RESUMO DO RELATÓRIO',bold:true,leading:21},{text:`${reportModeLabel()} — ${reportFilterDescription()}`,leading:17},pdfTableRow([['Produto'],['Quantidade'],['Valor']],{header:true,widths})];
+  const {total,commission,hasUnrecorded}=summary,selectedProductId=reportMode==='product'?$('reportProduct').value:'',selectedProduct=productById(selectedProductId),groups=reportProductGroups(sales).filter(group=>!selectedProductId||group.key===selectedProductId||group.name===selectedProduct?.name),widths=[280,100,145],lines=[pdfTableRow([['Produto'],['Quantidade'],['Valor']],{header:true,widths})];
   groups.forEach((group,index)=>lines.push(pdfTableRow([[group.name],[`${group.quantity} un.`],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
   if(!groups.length)lines.push(pdfTableRow([['Nenhum produto'],['0 un.'],[money.format(0)]],{widths}));
-  lines.push({text:`${saleCount} venda(s) • ${units} unidade(s)`,bold:true,leading:18});
   lines.push(pdfTableRow([['Total Vendas'],[''],[money.format(total)]],{widths,boldCells:[0,2]}),pdfTableRow([['Comissão calculada'],[''],[money.format(commission)]],{widths,boldCells:[0,2]}));
   if(reportMode==='date'||reportMode==='month'){
     const month=reportMode==='month'?$('reportMonth').value:'',expenses=db.expenses.filter(expense=>reportMode==='date'?expense.date===$('reportDate').value:(!month||saleMonth({date:expense.date})===month)),expenseTotal=Math.round(expenses.reduce((sum,expense)=>sum+num(expense.amount),0)*100)/100,pixSales=sales.filter(sale=>num(sale.pixAmount)>0),pixTotal=Math.round(sales.reduce((sum,sale)=>sum+num(sale.pixAmount),0)*100)/100,balance=Math.round((total-expenseTotal-pixTotal)*100)/100;
-    lines.push(pdfTableRow([['Despesas'],[''],[money.format(expenseTotal)]],{widths}),pdfTableRow([[`${pixSales.length} Pagto Pix`],[''],[money.format(pixTotal)]],{widths}),pdfTableRow([['Total Saldo'],[''],[money.format(balance)]],{widths,shade:true,boldCells:[0,2]}),{text:'Saldo = total de vendas − despesas − valores recebidos em Pix.',leading:16});
+    lines.push(pdfTableRow([['Despesas'],[''],[money.format(expenseTotal)]],{widths}),pdfTableRow([[`${pixSales.length} Pagto Pix`],[''],[money.format(pixTotal)]],{widths}),pdfTableRow([['Total Saldo'],[''],[money.format(balance)]],{widths,shade:true,boldCells:[0,2]}),{text:'',leading:22},{text:'Saldo = total de vendas − despesas − valores recebidos em Pix.',leading:16});
   }else lines.push({text:'Despesas, Pix e saldo não são atribuídos a um cliente ou produto específico.',leading:16});
   if(hasUnrecorded)lines.push({text:'Vendas anteriores sem comissão registrada não têm cálculo retroativo.',leading:16});
   return lines;
