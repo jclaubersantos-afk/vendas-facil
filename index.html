@@ -554,7 +554,7 @@ function pdfBlobFromLines(reportLines){
   return new Blob([pdf],{type:'application/pdf'});
 }
 function reportPdfSummaryLines(sales,summary){
-  const {total,commission,hasUnrecorded}=summary,selectedProductId=reportMode==='product'?$('reportProduct').value:'',selectedProduct=productById(selectedProductId),groups=reportProductGroups(sales).filter(group=>!selectedProductId||group.key===selectedProductId||group.name===selectedProduct?.name),widths=[280,100,145],lines=[pdfTableRow([['Produto'],['Quantidade'],['Valor']],{header:true,widths})];
+  const {total,commission,hasUnrecorded}=summary,selectedProductId=reportMode==='product'?$('reportProduct').value:'',selectedProduct=productById(selectedProductId),groups=reportProductGroups(sales).filter(group=>!selectedProductId||group.key===selectedProductId||group.name===selectedProduct?.name),widths=[260,100,139],lines=[pdfTableRow([['Produto'],['Quantidade'],['Valor']],{header:true,widths})];
   groups.forEach((group,index)=>lines.push(pdfTableRow([[group.name],[`${group.quantity} un.`],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
   if(!groups.length)lines.push(pdfTableRow([['Nenhum produto'],['0 un.'],[money.format(0)]],{widths}));
   lines.push(pdfTableRow([['Total Vendas'],[''],[money.format(total)]],{widths,boldCells:[0,2]}),pdfTableRow([['Comissão calculada'],[''],[money.format(commission)]],{widths,boldCells:[0,2]}));
