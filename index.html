@@ -516,15 +516,24 @@ function pdfTableRowContent(row,top){
 }
 function pdfBlobFromLines(reportLines){
   const pageContents=[];let content='',y=790,tableHeader=null;
-  reportLines.forEach(line=>{
+  const flowHeight=line=>{const hasText=!!line.text,size=(line.size||10)+(hasText?1:0);return hasText?Math.max(size+2,(line.leading||14)-2):Math.max(4,(line.leading||8)-2)};
+  const addLine=line=>{
     if(line.tableRow){
       if(y-line.height<48){if(content)pageContents.push(content);content='';y=790;if(tableHeader&&!line.header){content+=pdfTableRowContent(tableHeader,y);y-=tableHeader.height}}
       content+=pdfTableRowContent(line,y);y-=line.height;if(line.header)tableHeader=line;return;
     }
-    const hasText=!!line.text,size=(line.size||10)+(hasText?1:0),leading=hasText?Math.max(size+2,(line.leading||14)-2):Math.max(4,(line.leading||8)-2);
+    const hasText=!!line.text,size=(line.size||10)+(hasText?1:0),leading=flowHeight(line);
     if(y-leading<48){if(content)pageContents.push(content);content='';y=790}
     if(line.text)content+=`BT /${line.bold?'F2':'F1'} ${size} Tf 0.92 0.95 0.94 rg 48 ${y} Td <${pdfHex(line.text)}> Tj ET\n`;
     y-=leading;
+  };
+  reportLines.forEach(line=>{
+    if(line.keepTogether&&Array.isArray(line.lines)){
+      const blockHeight=line.lines.reduce((sum,item)=>sum+(item.tableRow?item.height:flowHeight(item)),0);
+      if(blockHeight<=742&&y-blockHeight<48){if(content)pageContents.push(content);content='';y=790}
+      tableHeader=null;line.lines.forEach(addLine);tableHeader=null;return;
+    }
+    addLine(line);
   });
   if(content||!pageContents.length)pageContents.push(content);
   const pageCount=pageContents.length,fontRegularId=3+pageCount*2,fontBoldId=fontRegularId+1,objects=new Array(fontBoldId+1);
@@ -565,16 +574,16 @@ function reportPdfLines(){
   if(isProduct&&!productId){
     const widths=[210,72,65,152],groups=reportProductGroups(sales);lines.push(pdfTableRow([['Produto'],['Unidades'],['Vendas'],['Total / comissão']],{header:true,widths}));
     groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,36),[`${group.quantity} un.`],[String(group.sales)],[`Vendido: ${money.format(group.total)}`,`Comissão: ${money.format(group.commission)}`]],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[1]]})));
-    lines.push(...reportPdfSummaryLines(sales,summary));return lines;
+    lines.push({keepTogether:true,lines:reportPdfSummaryLines(sales,summary)});return lines;
   }
   if(isProduct){
     const widths=[129,130,55,185];lines.push(pdfTableRow([['Data / cliente'],['Produto'],['Qtd.'],['Vendido / comissão']],{header:true,widths}));
     items.forEach(({sale,item},index)=>{const clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${sale.customerName||'Consumidor não identificado'}`,25),productLines=wrapPdfText(item.productName||'Produto removido',25),paymentLines=[`Vendido: ${money.format(item.total)}`,`Comissão: ${money.format(commissionForItem(item))}`];lines.push(pdfTableRow([clientLines,productLines,[`${item.quantity} un.`],paymentLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[1]]}))});
-    lines.push(...reportPdfSummaryLines(sales,summary));return lines;
+    lines.push({keepTogether:true,lines:reportPdfSummaryLines(sales,summary)});return lines;
   }
   const widths=[132,130,55,182];lines.push(pdfTableRow([['Data / cliente'],['Produto(s)'],['Quantidade'],['Pagamento / comissão']],{header:true,widths}));
   sales.forEach((sale,index)=>{const code=saleCustomerCode(sale),clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,25),productLines=[],quantityLines=[],paymentLines=[];saleItems(sale).forEach(item=>wrapPdfText(item.productName||'Produto removido',24).forEach((part,lineIndex)=>{productLines.push(part);quantityLines.push(lineIndex===0?`${item.quantity} un.`:'' )}));if(num(sale.pixAmount)>0)paymentLines.push(...wrapPdfText(`Pix: ${money.format(sale.pixAmount)}`,30));if(num(sale.cashAmount)>0)paymentLines.push(...wrapPdfText(`Dinheiro: ${money.format(sale.cashAmount)}`,30));paymentLines.push(...wrapPdfText(`Total pago: ${money.format(num(sale.pixAmount)+num(sale.cashAmount))}`,30),`Comissão: ${money.format(saleCommission(sale))}`);lines.push(pdfTableRow([clientLines,productLines,quantityLines,paymentLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[paymentLines.length-1]]}))});
-  lines.push(...reportPdfSummaryLines(sales,summary));return lines;
+  lines.push({keepTogether:true,lines:reportPdfSummaryLines(sales,summary)});return lines;
 }
 function reportPdfBlob(){return pdfBlobFromLines(reportPdfLines())}
 function dailyPdfBlob(sales){return pdfBlobFromLines(dailyReportLines(sales))}
@@ -607,7 +616,7 @@ async function saveDailyClosingPdf(){
   download(filename,blob,'application/pdf');
 }
 async function saveReportPdf(){
-  const filename=`relatorio-${reportMode}-${reportFileSuffix()}.pdf`,blob=reportPdfBlob();
+  const generatedAt=new Date(),timeStamp=[generatedAt.getHours(),generatedAt.getMinutes(),generatedAt.getSeconds()].map(value=>String(value).padStart(2,'0')).join('-'),filename=`relatorio-${reportMode}-${reportFileSuffix()}-${localDate()}-${timeStamp}.pdf`,blob=reportPdfBlob();
   if(window.AndroidDownloads&&typeof window.AndroidDownloads.saveToDownloads==='function'){
     try{pendingAndroidDownloadMessage='Relatório em PDF salvo na pasta Downloads.';const base64=await blobToBase64(blob);window.AndroidDownloads.saveToDownloads(base64,filename,'application/pdf');notify('Salvando relatório em PDF na pasta Downloads…')}catch(error){console.error(error);notify('Não consegui preparar o relatório em PDF.','error')}return;
   }
