@@ -1,5 +1,5 @@
 'use strict';
-const CACHE_NAME = 'vendas-facil-static-v31';
+const CACHE_NAME = 'vendas-facil-static-v32';
 const APP_FILES = [
   './',
   './index.html',
