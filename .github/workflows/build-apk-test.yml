@@ -1,0 +1,65 @@
+name: Build Vendalume Test APK
+
+on:
+  push:
+    branches:
+      - vendalume-licenca-teste
+    paths:
+      - 'android-project-test.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+
+      - name: Unpack test Android project
+        run: unzip -q android-project-test.zip -d android
+
+      - name: Check bundled JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('android/app/src/main/assets/index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('No embedded scripts found');
+          scripts.forEach((match, index) => new Function(match[1]));
+          console.log(`Validated ${scripts.length} embedded scripts`);
+          NODE
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Build side-by-side debug APK
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK as a temporary test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vendalume-teste-${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
