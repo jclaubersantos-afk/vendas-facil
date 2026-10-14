@@ -1,4 +1,4 @@
-name: Build Vendas Facil APK
+name: Build Vendalume APK
 
 on:
   workflow_dispatch:
@@ -57,9 +57,9 @@ jobs:
       - name: Upload APK as GitHub release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vendas-facil-apk-1.1.0
-          name: Vendas Fácil APK 1.1.0
-          body: APK Android versão 1.1.0 com atualização de cache para carregar sempre o relatório PDF mais recente. Mantém notificações locais, salvamento nativo em Downloads e restauração de backup JSON.
+          tag_name: vendalume-apk-1.2.0
+          name: Vendalume APK 1.2.0
+          body: APK Vendalume versão 1.2.0, com o novo nome do aplicativo e atualização para carregar o site e os relatórios mais recentes. Mantém notificações locais, salvamento em Downloads e restauração de backup JSON.
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
