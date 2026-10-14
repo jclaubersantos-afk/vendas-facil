@@ -311,7 +311,7 @@ function downloadReceiptBlob(blob,filename){const url=URL.createObjectURL(blob),
 async function shareCompletedOrderReceipt(){const sale=db.sales.find(item=>item.id===completedOrderSaleId);if(!sale){notify('Não encontrei o pedido finalizado.','error');return}const customer=customerById(sale.customerId),phone=whatsAppPhoneNumber(customer?.phone);if(!phone){notify('Cadastre um telefone válido para o cliente antes de compartilhar.','error');return}const button=$('sendCompletedOrder');button.disabled=true;try{const blob=await createOrderReceiptBlob(sale),note=text($('orderWhatsAppNote').value).trim(),filename=`comprovante-pedido-${text(sale.date).replace(/[^0-9-]/g,'')||'venda'}-${text(sale.id).replace(/[^A-Za-z0-9-]/g,'').slice(0,16)||'pedido'}.png`;if(shareWithAndroid(blob,filename,'image/png','Compartilhar comprovante do pedido',note)){notify('Escolha WhatsApp, selecione a conversa do cliente e confirme o envio.');return}const file=new File([blob],filename,{type:'image/png'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'Comprovante do pedido',text:note});return}catch(error){if(error?.name==='AbortError')return}}downloadReceiptBlob(blob,filename);notify('Comprovante salvo. Abra o WhatsApp, escolha o cliente e anexe a imagem.')}catch(error){console.error(error);notify('Não consegui gerar o comprovante visual.','error')}finally{button.disabled=!phone}}
 function sendCompletedOrderWhatsApp(){const sale=db.sales.find(item=>item.id===completedOrderSaleId);if(!sale){notify('Não encontrei o pedido finalizado.','error');return}const customer=customerById(sale.customerId),phone=whatsAppPhoneNumber(customer?.phone);if(!phone){notify('Cadastre um telefone válido para o cliente antes de enviar.','error');return}const url=`https://wa.me/${phone}?text=${encodeURIComponent(completedOrderWhatsAppMessage(sale,$('orderWhatsAppNote').value))}`,link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.click()}
 function startNewSale(){completedOrderSaleId='';$('orderWhatsAppNote').value='';renderCompletedOrder();window.scrollTo({top:0,behavior:'smooth'});$('saleCustomer').focus()}
-function pdfSaleTableRow(sale,shade=false){const widths=[190,105,74,130],productLines=[],quantityLines=[];saleItems(sale).forEach(item=>wrapPdfText(item.productName||'Produto removido',24).forEach((part,lineIndex)=>{productLines.push(part);quantityLines.push(lineIndex===0?`${item.quantity} un.`:'' )}));const code=saleCustomerCode(sale),customerLines=wrapPdfText(`${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,38);if(sale.note)customerLines.push(...wrapPdfText(`Obs: ${sale.note}`,30));const pix=num(sale.pixAmount),cash=num(sale.cashAmount),paid=Math.round((pix+cash)*100)/100,paymentLines=[];if(pix>0)paymentLines.push(...wrapPdfText(`Pix: ${money.format(pix)}`,28));if(cash>0)paymentLines.push(...wrapPdfText(`Dinheiro: ${money.format(cash)}`,28));if(pix<=0&&cash<=0)paymentLines.push('Pagamento não informado');paymentLines.push(...wrapPdfText(`Total pago: ${money.format(paid)}`,28));return pdfTableRow([customerLines,productLines,quantityLines,paymentLines],{widths,shade,boldCells:[0],boldLines:[[],[],[],[paymentLines.length-1]],rightAlignCells:[2,3]})}
+function pdfSaleTableRow(sale,shade=false){const widths=[190,105,74,130],productLines=[],quantityLines=[];saleItems(sale).forEach(item=>wrapPdfText(item.productName||'Produto removido',36).forEach((part,lineIndex)=>{productLines.push(part);quantityLines.push(lineIndex===0?`${item.quantity} un.`:'' )}));const code=saleCustomerCode(sale),customerLines=wrapPdfText(`${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,57);if(sale.note)customerLines.push(...wrapPdfText(`Obs: ${sale.note}`,45));const pix=num(sale.pixAmount),cash=num(sale.cashAmount),paid=Math.round((pix+cash)*100)/100,paymentLines=[];if(pix>0)paymentLines.push(...wrapPdfText(`Pix: ${money.format(pix)}`,42));if(cash>0)paymentLines.push(...wrapPdfText(`Dinheiro: ${money.format(cash)}`,42));if(pix<=0&&cash<=0)paymentLines.push('Pagamento não informado');paymentLines.push(...wrapPdfText(`Total pago: ${money.format(paid)}`,42));return pdfTableRow([customerLines,productLines,quantityLines,paymentLines],{widths,shade,boldCells:[0],boldLines:[[],[],[],[paymentLines.length-1]],rightAlignCells:[2,3]})}
 function commissionForItem(item){return Math.round(num(item.quantity)*num(item.commissionPerUnit)*100)/100}
 function saleCommission(sale){return Math.round(saleItems(sale).reduce((sum,item)=>sum+commissionForItem(item),0)*100)/100}
 function reportSellerGroups(sales){const groups=new Map();sales.forEach(sale=>{const seller=sellerById(sale.sellerId),hasSeller=!!(text(sale.sellerId)||text(sale.sellerName)),name=text(sale.sellerName)||seller?.name||(sale.sellerId?'Vendedor removido':'Sem vendedor'),key=text(sale.sellerId)|| (hasSeller?`name:${normalizeContactName(name)}`:'__unassigned__');let group=groups.get(key);if(!group){group={key,name,sales:0,units:0,total:0,commission:0};groups.set(key,group)}group.sales++;group.units+=num(sale.quantity);group.total+=num(sale.total);if(hasSeller)group.commission+=saleCommission(sale)});return [...groups.values()].map(group=>({...group,total:Math.round(group.total*100)/100,commission:Math.round(group.commission*100)/100})).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))}
@@ -564,37 +564,37 @@ function pdfTableRow(cells,options={}){
   const normalized=cells.map(cell=>Array.isArray(cell)?cell.map(value=>String(value)): [String(cell)]),maxLines=Math.max(1,...normalized.map(cell=>cell.length)),header=!!options.header,lineHeight=options.lineHeight||9.5,fontSize=options.fontSize||(header?9:8.6),height=options.height||(header?22:Math.max(18,6+maxLines*lineHeight)),defaultWidths=[132,130,55,182],widths=Array.isArray(options.widths)&&options.widths.length===normalized.length?options.widths:defaultWidths;
   return {tableRow:true,cells:normalized,header,shade:!!options.shade,boldCells:options.boldCells||[],boldLines:options.boldLines||[],rightAlignCells:options.rightAlignCells||[],alignments:options.alignments||[],plain:!!options.plain,widths,lineHeight,fontSize,height};
 }
-function pdfTableRowContent(row,top){
-  const x0=48,width=row.widths.reduce((sum,value)=>sum+value,0),bottom=top-row.height,fill=row.header?'0.08 0.32 0.30':row.shade?'0.13 0.18 0.18':'0.10 0.15 0.15',border='0.30 0.43 0.41';
+function pdfTableRowContent(row,top,layout){
+  const x0=layout.margin,widths=row.widths.map(value=>row.plain?value:value*layout.tableScale),width=widths.reduce((sum,value)=>sum+value,0),bottom=top-row.height,fill=row.header?'0.08 0.32 0.30':row.shade?'0.13 0.18 0.18':'0.10 0.15 0.15',border='0.30 0.43 0.41';
   let content=row.plain?'':`q ${fill} rg ${x0} ${bottom} ${width} ${row.height} re f Q\n`,x=x0;
-  if(!row.plain)row.widths.forEach(cellWidth=>{content+=`q ${border} RG 0.45 w ${x} ${bottom} ${cellWidth} ${row.height} re S Q\n`;x+=cellWidth});
+  if(!row.plain)widths.forEach(cellWidth=>{content+=`q ${border} RG 0.45 w ${x} ${bottom} ${cellWidth} ${row.height} re S Q\n`;x+=cellWidth});
   x=x0;
   row.cells.forEach((cellLines,cellIndex)=>{
     cellLines.forEach((value,lineIndex)=>{
-      const valueText=String(value),approxWidth=valueText.length*row.fontSize*0.49,alignment=row.alignments[cellIndex]||(row.rightAlignCells.includes(cellIndex)?'right':cellIndex===2?'center':'left'),tx=alignment==='right'?x+Math.max(5,row.widths[cellIndex]-6-approxWidth):alignment==='center'?x+Math.max(5,(row.widths[cellIndex]-approxWidth)/2):x+6,baseline=top-4-row.fontSize-lineIndex*row.lineHeight,bold=row.header||row.boldCells.includes(cellIndex)||(row.boldLines[cellIndex]||[]).includes(lineIndex),color=row.header?'1 1 1':'0.92 0.95 0.94';
+      const valueText=String(value),approxWidth=valueText.length*row.fontSize*0.49,cellWidth=widths[cellIndex],alignment=row.alignments[cellIndex]||(row.rightAlignCells.includes(cellIndex)?'right':cellIndex===2?'center':'left'),tx=alignment==='right'?x+Math.max(5,cellWidth-6-approxWidth):alignment==='center'?x+Math.max(5,(cellWidth-approxWidth)/2):x+6,baseline=top-4-row.fontSize-lineIndex*row.lineHeight,bold=row.header||row.boldCells.includes(cellIndex)||(row.boldLines[cellIndex]||[]).includes(lineIndex),color=row.header?'1 1 1':'0.92 0.95 0.94';
       if(valueText)content+=`BT /${bold?'F2':'F1'} ${row.fontSize} Tf ${color} rg ${tx} ${baseline} Td <${pdfHex(valueText)}> Tj ET\n`;
     });
-    x+=row.widths[cellIndex];
+    x+=widths[cellIndex];
   });
   return content;
 }
-function pdfBlobFromLines(reportLines){
-  const pageContents=[];let content='',y=790,tableHeader=null;
+function pdfBlobFromLines(reportLines,orientation='landscape'){
+  const pageWidth=orientation==='landscape'?842:595,pageHeight=orientation==='landscape'?595:842,layout={margin:48,top:pageHeight-52,bottom:40,tableScale:(pageWidth-96)/499},pageContents=[];let content='',y=layout.top,tableHeader=null;
   const flowHeight=line=>{const hasText=!!line.text,size=(line.size||10)+(hasText?1:0);return hasText?Math.max(size+2,(line.leading||14)-2):Math.max(4,(line.leading||8)-2)};
   const addLine=line=>{
     if(line.tableRow){
-      if(y-line.height<48){if(content)pageContents.push(content);content='';y=790;if(tableHeader&&!line.header&&!line.plain){content+=pdfTableRowContent(tableHeader,y);y-=tableHeader.height}}
-      content+=pdfTableRowContent(line,y);y-=line.height;if(line.header)tableHeader=line;else if(line.plain)tableHeader=null;return;
+      if(y-line.height<layout.bottom){if(content)pageContents.push(content);content='';y=layout.top;if(tableHeader&&!line.header&&!line.plain){content+=pdfTableRowContent(tableHeader,y,layout);y-=tableHeader.height}}
+      content+=pdfTableRowContent(line,y,layout);y-=line.height;if(line.header)tableHeader=line;else if(line.plain)tableHeader=null;return;
     }
     const hasText=!!line.text,size=(line.size||10)+(hasText?1:0),leading=flowHeight(line);
-    if(y-leading<48){if(content)pageContents.push(content);content='';y=790}
-    if(line.text)content+=`BT /${line.bold?'F2':'F1'} ${size} Tf 0.92 0.95 0.94 rg 48 ${y} Td <${pdfHex(line.text)}> Tj ET\n`;
+    if(y-leading<layout.bottom){if(content)pageContents.push(content);content='';y=layout.top}
+    if(line.text)content+=`BT /${line.bold?'F2':'F1'} ${size} Tf 0.92 0.95 0.94 rg ${layout.margin} ${y} Td <${pdfHex(line.text)}> Tj ET\n`;
     y-=leading;
   };
   reportLines.forEach(line=>{
     if(line.keepTogether&&Array.isArray(line.lines)){
       const blockHeight=line.lines.reduce((sum,item)=>sum+(item.tableRow?item.height:flowHeight(item)),0);
-      if(blockHeight<=742&&y-blockHeight<48){if(content)pageContents.push(content);content='';y=790}
+      if(blockHeight<=layout.top-layout.bottom&&y-blockHeight<layout.bottom){if(content)pageContents.push(content);content='';y=layout.top}
       tableHeader=null;line.lines.forEach(addLine);tableHeader=null;return;
     }
     addLine(line);
@@ -606,9 +606,9 @@ function pdfBlobFromLines(reportLines){
   objects[fontRegularId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
   objects[fontBoldId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
   pageContents.forEach((pageContent,index)=>{
-    const pageId=3+index*2,streamId=pageId+1,pageStream=`q 0.06 0.08 0.08 rg 0 0 595 842 re f Q\n${pageContent}`;
+    const pageId=3+index*2,streamId=pageId+1,pageStream=`q 0.06 0.08 0.08 rg 0 0 ${pageWidth} ${pageHeight} re f Q\n${pageContent}`;
     objects[streamId]=`<< /Length ${pageStream.length} >>\nstream\n${pageStream}endstream`;
-    objects[pageId]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${streamId} 0 R >>`;
+    objects[pageId]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${streamId} 0 R >>`;
   });
   let pdf='%PDF-1.4\n';const offsets=new Array(objects.length).fill(0);
   for(let id=1;id<objects.length;id++){offsets[id]=pdf.length;pdf+=`${id} 0 obj\n${objects[id]}\nendobj\n`}
@@ -619,7 +619,7 @@ function pdfBlobFromLines(reportLines){
 }
 function reportPdfSummaryLines(sales,summary){
   const {total}=summary,selectedProductId=reportMode==='product'?$('reportProduct').value:'',selectedProduct=productById(selectedProductId),groups=reportProductGroups(sales).filter(group=>!selectedProductId||group.key===selectedProductId||group.name===selectedProduct?.name),widths=[260,100,139],lines=[pdfTableRow([['Produto'],['Quantidade'],['Valor']],{header:true,widths})];
-  groups.forEach((group,index)=>lines.push(pdfTableRow([[group.name],[`${group.quantity} un.`],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
+  groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,84),[`${group.quantity} un.`],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
   if(!groups.length)lines.push(pdfTableRow([['Nenhum produto'],['0 un.'],[money.format(0)]],{widths}));
   lines.push(pdfTableRow([['Total Vendas'],[''],[money.format(total)]],{widths,boldCells:[0,2]}));
   if(reportMode==='date'||reportMode==='month'){
@@ -635,7 +635,7 @@ function reportPdfLines(){
   if(reportMode==='seller'){
     const groups=reportSellerGroups(sales),widths=[150,55,55,110,129],totalUnits=groups.reduce((sum,group)=>sum+group.units,0),total=Math.round(groups.reduce((sum,group)=>sum+group.total,0)*100)/100,totalCommission=Math.round(groups.reduce((sum,group)=>sum+group.commission,0)*100)/100;
     lines.push({text:'RESUMO POR VENDEDOR',bold:true,leading:19},{text:reportFilterDescription(),leading:17},pdfTableRow([['Vendedor'],['Vendas'],['Unid.'],['Total vendido'],['Comissão']],{header:true,widths,rightAlignCells:[1,2,3,4]}));
-    groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,28),[String(group.sales)],[`${group.units} un.`],[money.format(group.total)],[money.format(group.commission)]],{widths,shade:index%2===1,boldCells:[0],rightAlignCells:[1,2,3,4]})));
+    groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,42),[String(group.sales)],[`${group.units} un.`],[money.format(group.total)],[money.format(group.commission)]],{widths,shade:index%2===1,boldCells:[0],rightAlignCells:[1,2,3,4]})));
     lines.push(pdfTableRow([['TOTAL'],[String(sales.length)],[`${totalUnits} un.`],[money.format(total)],[money.format(totalCommission)]],{widths,shade:true,boldCells:[0,1,2,3,4],rightAlignCells:[1,2,3,4]}));
     if(hasUnrecorded)lines.push({text:'Vendas anteriores sem comissão registrada não têm cálculo retroativo.',leading:16});
     return lines;
@@ -643,16 +643,16 @@ function reportPdfLines(){
   lines.push({text:isProduct?'VENDAS POR PRODUTO':'MOVIMENTAÇÕES',bold:true,leading:19});
   if(isProduct&&!productId){
     const widths=[210,80,70,139],groups=reportProductGroups(sales);lines.push(pdfTableRow([['Produto'],['Unidades'],['Vendas'],['Total vendido']],{header:true,widths}));
-    groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,36),[`${group.quantity} un.`],[String(group.sales)],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
+    groups.forEach((group,index)=>lines.push(pdfTableRow([wrapPdfText(group.name,54),[`${group.quantity} un.`],[String(group.sales)],[money.format(group.total)]],{widths,shade:index%2===1,boldCells:[0]})));
     lines.push({keepTogether:true,lines:reportPdfSummaryLines(sales,summary)});return lines;
   }
   if(isProduct){
     const widths=[129,130,55,185];lines.push(pdfTableRow([['Data / cliente'],['Produto'],['Qtd.'],['Valor vendido']],{header:true,widths}));
-    items.forEach(({sale,item},index)=>{const clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${sale.customerName||'Consumidor não identificado'}`,25),productLines=wrapPdfText(item.productName||'Produto removido',25),valueLines=[money.format(item.total)];lines.push(pdfTableRow([clientLines,productLines,[`${item.quantity} un.`],valueLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[0]]}))});
+    items.forEach(({sale,item},index)=>{const clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${sale.customerName||'Consumidor não identificado'}`,38),productLines=wrapPdfText(item.productName||'Produto removido',38),valueLines=[money.format(item.total)];lines.push(pdfTableRow([clientLines,productLines,[`${item.quantity} un.`],valueLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[0]]}))});
     lines.push({keepTogether:true,lines:reportPdfSummaryLines(sales,summary)});return lines;
   }
   const widths=[150,130,55,164];lines.push(pdfTableRow([['Data / cliente'],['Produto(s)'],['Quantidade'],['Pagamento']],{header:true,widths}));
-  sales.forEach((sale,index)=>{const code=saleCustomerCode(sale),clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,25),productLines=[],quantityLines=[],paymentLines=[];saleItems(sale).forEach(item=>wrapPdfText(item.productName||'Produto removido',24).forEach((part,lineIndex)=>{productLines.push(part);quantityLines.push(lineIndex===0?`${item.quantity} un.`:'' )}));if(num(sale.pixAmount)>0)paymentLines.push(...wrapPdfText(`Pix: ${money.format(sale.pixAmount)}`,28));if(num(sale.cashAmount)>0)paymentLines.push(...wrapPdfText(`Dinheiro: ${money.format(sale.cashAmount)}`,28));paymentLines.push(...wrapPdfText(`Total pago: ${money.format(num(sale.pixAmount)+num(sale.cashAmount))}`,28));lines.push(pdfTableRow([clientLines,productLines,quantityLines,paymentLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[paymentLines.length-1]]}))});
+  sales.forEach((sale,index)=>{const code=saleCustomerCode(sale),clientLines=wrapPdfText(`${dateLabel(sale.date)} · ${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,38),productLines=[],quantityLines=[],paymentLines=[];saleItems(sale).forEach(item=>wrapPdfText(item.productName||'Produto removido',36).forEach((part,lineIndex)=>{productLines.push(part);quantityLines.push(lineIndex===0?`${item.quantity} un.`:'' )}));if(num(sale.pixAmount)>0)paymentLines.push(...wrapPdfText(`Pix: ${money.format(sale.pixAmount)}`,42));if(num(sale.cashAmount)>0)paymentLines.push(...wrapPdfText(`Dinheiro: ${money.format(sale.cashAmount)}`,42));paymentLines.push(...wrapPdfText(`Total pago: ${money.format(num(sale.pixAmount)+num(sale.cashAmount))}`,42));lines.push(pdfTableRow([clientLines,productLines,quantityLines,paymentLines],{widths,shade:index%2===1,boldCells:[0],boldLines:[[],[],[],[paymentLines.length-1]]}))});
   lines.push({keepTogether:true,lines:reportPdfSummaryLines(sales,summary)});return lines;
 }
 function reportPdfBlob(){return pdfBlobFromLines(reportPdfLines())}
