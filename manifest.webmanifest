@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Vendas Fácil — Gestão de Estoque e Vendas",
-  "short_name": "Vendas Fácil",
-  "description": "Controle produtos, estoque, clientes e vendas no próprio aparelho.",
+  "name": "Vendalume — Gestão de Vendas e Estoque",
+  "short_name": "Vendalume",
+  "description": "Controle vendas, estoque, clientes e caixa no próprio aparelho.",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",
