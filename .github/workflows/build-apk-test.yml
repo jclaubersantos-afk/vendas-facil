@@ -5,6 +5,8 @@ on:
     branches:
       - vendalume-licenca-teste
     paths:
+      - 'unificacao-vendalume/**'
+      - '.github/workflows/build-apk-test.yml'
       - 'android-project-test.zip'
   workflow_dispatch:
 
@@ -18,8 +20,10 @@ jobs:
       - name: Checkout test branch
         uses: actions/checkout@v4
 
-      - name: Unpack test Android project
-        run: unzip -q android-project-test.zip -d android
+      - name: Generate test Android project from shared source
+        run: |
+          python3 unificacao-vendalume/scripts/build_variants.py
+          unzip -q unificacao-vendalume/dist/test/android-project-test.zip -d android
 
       - name: Check bundled JavaScript syntax
         run: |
