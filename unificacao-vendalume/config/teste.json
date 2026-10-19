@@ -1,0 +1,11 @@
+{
+  "displayName": "Vendalume - Teste",
+  "target": "android-debug",
+  "applicationId": "com.clauber.vendasfacil.teste",
+  "applicationIdSuffix": ".teste",
+  "licenseRequired": true,
+  "historicalCashClosing": true,
+  "versionCode": 12,
+  "versionName": "1.1.1",
+  "publishAutomatically": false
+}
