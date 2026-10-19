@@ -669,22 +669,85 @@ function cashClosingPdfLines(){
     {text:'Vendalume — Fechamento do caixa',bold:true,size:16,leading:24},
     {text:`Data: ${dateLabel(data.date)}    ${data.sales.length} ${data.sales.length===1?'venda':'vendas'}`,leading:19},
     {text:'MOVIMENTAÇÕES DO DIA',bold:true,leading:16},
-    pdfTableRow([['Cliente'],['Produto'],['Quant.'],['Forma de Pagto.']],{header:true,widths:[190,105,74,130],rightAlignCells:[2,3]})
+    pdfTableRow([['Cliente'],['Produto'],['Quant.'],['Forma de Pagto.']],{header:true,widths:[160,275,85,266],fontSize:10,height:22})
   ];
-  if(!data.sales.length)lines.push(pdfTableRow([['Nenhuma venda registrada nesta data.'],[''],[''],['']],{widths:[190,105,74,130],rightAlignCells:[2,3]}));
-  data.sales.slice().sort((a,b)=>text(b.createdAt||b.date).localeCompare(text(a.createdAt||a.date))).forEach((sale,index)=>lines.push(pdfSaleTableRow(sale,index%2===1)));
-  lines.push({text:'',leading:16},{text:'UNIDADES VENDIDAS',bold:true,size:12,leading:20});
-  if(!data.products.length)lines.push({text:'Nenhum produto vendido hoje.',leading:18});
-  data.products.forEach(item=>lines.push({text:`${item.name} — ${item.quantity} un.`,bold:true,size:13,leading:22}));
-  lines.push({text:'',leading:8},{text:'DESPESAS DO DIA',bold:true,leading:21});
-  if(!data.expenses.length)lines.push({text:'Nenhuma despesa registrada.',leading:18});
-  else data.expenses.forEach(expense=>wrapPdfText(`${expense.type}: ${money.format(expense.amount)}`,84).forEach(text=>lines.push({text,leading:16})));
-  const pixCount=`${data.pixTransactions} ${data.pixTransactions===1?'pagamento':'pagamentos'}`;
-  lines.push({text:'',leading:8},{text:'FECHAMENTO FINANCEIRO',bold:true,leading:21},{text:`Total das vendas: ${money.format(data.totalSales)}`,bold:true,leading:19},{text:`Despesas do dia: ${money.format(data.totalExpenses)}`,leading:19},{text:`Recebido em Pix (${pixCount}): ${money.format(data.pixTotal)}`,leading:19},{text:`Recebido em dinheiro: ${money.format(data.cashTotal)}`,leading:19},{text:`Saldo em caixa: ${money.format(data.balance)}`,bold:true,size:13,leading:22},{text:'Saldo em caixa = dinheiro recebido - despesas do dia.',leading:18});
-  const count=cashCountRecord(data.date);if(count){const result=summarizeCashCount(count,data.date,data),differenceLabel=result.difference<0?`Faltam ${money.format(Math.abs(result.difference))}`:result.difference>0?`Sobram ${money.format(result.difference)}`:`${money.format(0)} — conferido`;lines.push({text:'',leading:8},{text:'CONTAGEM FÍSICA DO DINHEIRO',bold:true,leading:21},{text:`Troco inicial: ${money.format(result.openingCash)}`,leading:18},{text:`Quantidade de cédulas: ${result.billQuantity}`,leading:18});let billsListed=0;CASH_DENOMINATIONS.forEach(value=>{const quantity=result.bills[String(value)]||0;if(quantity){billsListed++;lines.push(pdfTableRow([[String(quantity)],['- Notas de R$'],[String(value)],['='],[money.format(value*quantity)]],{widths:[32,100,42,30,75],alignments:['right','left','right','left','right'],fontSize:10,lineHeight:15,height:24,plain:true}))}});if(!billsListed)lines.push({text:'Nenhuma cédula contada.',leading:17});lines.push({text:'',leading:12},{text:`Total em cédulas: ${money.format(result.billsTotal)}`,leading:18},{text:`Total em moedas: ${money.format(result.coinsTotal)}`,leading:18},{text:`TOTAL CONTADO: ${money.format(result.totalCounted)}`,bold:true,leading:20},{text:`Saldo esperado: ${money.format(result.expected)}`,leading:18},{text:`Diferença: ${differenceLabel}`,bold:true,leading:20})}
+  if(!data.sales.length)lines.push(pdfTableRow([['Nenhuma venda registrada nesta data.'],[''],[''],['']],{widths:[160,275,85,266]}));
+  data.sales.slice().sort((a,b)=>text(b.createdAt||b.date).localeCompare(text(a.createdAt||a.date))).forEach((sale,index)=>{
+    const items=saleItems(sale),code=saleCustomerCode(sale),customer=`${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,customerLines=wrapPdfText(customer,43),productNames=items.map(item=>item.productName||'Produto removido').join(' · '),productLines=wrapPdfText(productNames||'—',70),quantityText=items.map(item=>`${item.quantity} un.`).join(' + '),quantityLines=wrapPdfText(quantityText||'0 un.',18),pix=num(sale.pixAmount),cash=num(sale.cashAmount),paid=Math.round((pix+cash)*100)/100,payments=[];
+    if(pix>0)payments.push(`Pix: ${money.format(pix)}`);
+    if(cash>0)payments.push(`Dinheiro: ${money.format(cash)}`);
+    if(!payments.length)payments.push('Pagamento não informado');
+    payments.push(`Total: ${money.format(paid)}`);
+    const paymentLines=wrapPdfText(payments.join(' · '),62);
+    if(sale.note)customerLines.push(...wrapPdfText(`Obs.: ${sale.note}`,43));
+    const height=Math.max(18,5+Math.max(customerLines.length,productLines.length,quantityLines.length,paymentLines.length)*9.6);
+    lines.push(pdfTableRow([customerLines,productLines,quantityLines,paymentLines],{widths:[160,275,85,266],shade:index%2===1,fontSize:9.3,lineHeight:9.6,height,boldCells:[0],rightAlignCells:[2]}));
+  });
   return lines;
 }
-function cashClosingPdfBlob(){return pdfBlobFromLines(cashClosingPdfLines())}
+function cashClosingPdfBlob(){
+  const data=cashClosingData(),pageWidth=842,pageHeight=595,margin=28,pageContents=[];
+  const addText=(content,x,y,value,size=9,bold=false,color='0.92 0.95 0.94')=>content+`BT /${bold?'F2':'F1'} ${size} Tf ${color} rg ${x} ${y} Td <${pdfHex(value)}> Tj ET\n`;
+  const addHeader=(content,x,y,value,size=11.2)=>addText(content,x,y,value,size,true,'0.45 0.78 0.72');
+  const renderTable=(rows,x,top,width)=>{let content='',y=top;const scale=width/rows[0].widths.reduce((sum,v)=>sum+v,0),layout={margin:x,tableScale:scale};rows.forEach(row=>{content+=pdfTableRowContent(row,y,layout);y-=row.height});return {content,y}};
+  const sales=data.sales.slice().sort((a,b)=>text(b.createdAt||b.date).localeCompare(text(a.createdAt||a.date))),page1=[];
+  let y=pageHeight-34;
+  page1.push(`q 0.06 0.08 0.08 rg 0 0 ${pageWidth} ${pageHeight} re f Q\n`);
+  page1[0]=addText(page1[0],margin,y,'Vendalume — Fechamento do caixa',15.5,true);y-=20;
+  page1[0]=addText(page1[0],margin,y,`Data: ${dateLabel(data.date)}   ·   ${sales.length} ${sales.length===1?'venda':'vendas'}`,9.7,false,'0.66 0.74 0.72');y-=20;
+  page1[0]=addHeader(page1[0],margin,y,'MOVIMENTAÇÕES DO DIA',11.5);y-=9;
+  const saleRows=[pdfTableRow([['Cliente'],['Produto'],['Quant.'],['Forma de Pagto.']],{header:true,widths:[160,275,85,266],fontSize:10,height:22})];
+  if(!sales.length)saleRows.push(pdfTableRow([['Nenhuma venda registrada nesta data.'],[''],[''],['']],{widths:[160,275,85,266],fontSize:9.3,height:20}));
+  sales.forEach((sale,index)=>{
+    const items=saleItems(sale),code=saleCustomerCode(sale),customerLines=wrapPdfText(`${code?`${code} · `:''}${sale.customerName||'Consumidor não identificado'}`,43),productLines=wrapPdfText(items.map(item=>item.productName||'Produto removido').join(' · ')||'—',70),quantityLines=wrapPdfText(items.map(item=>`${item.quantity} un.`).join(' + ')||'0 un.',18),pix=num(sale.pixAmount),cash=num(sale.cashAmount),paid=Math.round((pix+cash)*100)/100,payments=[];
+    if(pix>0)payments.push(`Pix: ${money.format(pix)}`);if(cash>0)payments.push(`Dinheiro: ${money.format(cash)}`);if(!payments.length)payments.push('Pagamento não informado');payments.push(`Total: ${money.format(paid)}`);
+    if(sale.note)customerLines.push(...wrapPdfText(`Obs.: ${sale.note}`,43));
+    const paymentLines=wrapPdfText(payments.join(' · '),62),height=Math.max(18,5+Math.max(customerLines.length,productLines.length,quantityLines.length,paymentLines.length)*9.6);
+    saleRows.push(pdfTableRow([customerLines,productLines,quantityLines,paymentLines],{widths:[160,275,85,266],shade:index%2===1,fontSize:9.3,lineHeight:9.6,height,boldCells:[0],rightAlignCells:[2]}));
+  });
+  const saleTable=renderTable(saleRows,margin,y,pageWidth-2*margin);page1[0]+=saleTable.content;y=saleTable.y;
+  if(y<23)console.warn('Cash-closing sales table exceeded page 1; compact rows may need a continuation.');
+  pageContents.push(page1[0]);
+
+  const page2=[];page2.push(`q 0.06 0.08 0.08 rg 0 0 ${pageWidth} ${pageHeight} re f Q\n`);
+  let top=pageHeight-35;page2[0]=addText(page2[0],margin,top,'Vendalume — Fechamento do caixa',15,true);top-=18;
+  page2[0]=addText(page2[0],margin,top,`Resumo de ${dateLabel(data.date)}`,9.2,false,'0.66 0.74 0.72');
+  const leftX=margin,leftW=378,rightX=428,rightW=pageWidth-rightX-margin;
+  let ly=top-20,ry=top-20;const rowOpts={fontSize:9.2,lineHeight:11,height:21},headOpts={fontSize:9.5,height:22};
+  const drawSection=(x,y,width,title,rows,subtitle='')=>{let content=addHeader('',x,y,title,10.8);y-=15;if(subtitle){content+=addText('',x,y-1,subtitle,8.4,false,'0.66 0.74 0.72');y-=11}const table=renderTable(rows,x,y,width);content+=table.content;return {content,y:table.y-11}};
+  const productRows=[pdfTableRow([['Produto'],['Unidades']],{header:true,widths:[284,94],...headOpts})];
+  data.products.forEach((item,index)=>productRows.push(pdfTableRow([[item.name],[`${item.quantity} un.`]],{widths:[284,94],shade:index%2===1,...rowOpts,rightAlignCells:[1]})));
+  const totalUnits=data.products.reduce((sum,item)=>sum+num(item.quantity),0);productRows.push(pdfTableRow([['TOTAL DE UNIDADES'],[`${totalUnits} un.`]],{widths:[284,94],shade:true,boldCells:[0,1],...rowOpts,rightAlignCells:[1]}));
+  if(!data.products.length)productRows.splice(1,0,pdfTableRow([['Nenhum produto vendido'],['0 un.']],{widths:[284,94],...rowOpts}));
+  let section=drawSection(leftX,ly,leftW,'UNIDADES VENDIDAS',productRows);page2[0]+=section.content;ly=section.y;
+  const expenseRows=[pdfTableRow([['Despesa'],['Valor']],{header:true,widths:[284,94],...headOpts})];
+  data.expenses.forEach((expense,index)=>expenseRows.push(pdfTableRow([[expense.type],[money.format(expense.amount)]],{widths:[284,94],shade:index%2===1,...rowOpts,rightAlignCells:[1]})));
+  expenseRows.push(pdfTableRow([['TOTAL DESPESAS'],[money.format(data.totalExpenses)]],{widths:[284,94],shade:true,boldCells:[0,1],...rowOpts,rightAlignCells:[1]}));
+  if(!data.expenses.length)expenseRows.splice(1,0,pdfTableRow([['Nenhuma despesa'],[money.format(0)]],{widths:[284,94],...rowOpts,rightAlignCells:[1]}));
+  section=drawSection(leftX,ly,leftW,'DESPESAS DO DIA',expenseRows);page2[0]+=section.content;ly=section.y;
+  const pixCount=`${data.pixTransactions} ${data.pixTransactions===1?'pagamento':'pagamentos'}`,finance=[
+    ['Total das vendas',money.format(data.totalSales)],['Despesas do dia',money.format(data.totalExpenses)],[`Recebido em Pix (${pixCount})`,money.format(data.pixTotal)],['Recebido em dinheiro',money.format(data.cashTotal)],['Saldo em caixa',money.format(data.balance)],['Cálculo do saldo','Dinheiro recebido - despesas']
+  ],financeRows=[pdfTableRow([['Resumo'],['Valor']],{header:true,widths:[212,166],...headOpts})];
+  finance.forEach((row,index)=>financeRows.push(pdfTableRow([[row[0]],[row[1]]],{widths:[212,166],shade:index===4,boldCells:index===0||index===4?[0,1]:[],...rowOpts,rightAlignCells:[1]})));
+  section=drawSection(leftX,ly,leftW,'FECHAMENTO FINANCEIRO',financeRows);page2[0]+=section.content;ly=section.y;
+
+  const count=cashCountRecord(data.date);let countRows=[pdfTableRow([['Item'],['Quantidade'],['Valor unit.'],['Subtotal']],{header:true,widths:[145,65,75,101],...headOpts})];
+  if(count){
+    const result=summarizeCashCount(count,data.date,data);CASH_DENOMINATIONS.forEach(value=>{const quantity=result.bills[String(value)]||0;if(quantity)countRows.push(pdfTableRow([[`Cédulas de R$ ${value}`],[String(quantity)],[money.format(value)],[money.format(value*quantity)]],{widths:[145,65,75,101],shade:countRows.length%2===0,...rowOpts,rightAlignCells:[1,2,3]}))});
+    if(!result.billQuantity)countRows.push(pdfTableRow([['Nenhuma cédula contada.'],[''],[''],['']],{widths:[145,65,75,101],...rowOpts}));
+    const differenceLabel=result.difference<0?`Faltam ${money.format(Math.abs(result.difference))}`:result.difference>0?`Sobram ${money.format(result.difference)}`:`${money.format(0)} — conferido`;
+    [[`Troco inicial: ${money.format(result.openingCash)}`,'','',''],['Total de cédulas',String(result.billQuantity),'',money.format(result.billsTotal)],['Total em moedas','','',money.format(result.coinsTotal)],['TOTAL CONTADO','','',money.format(result.totalCounted)],['Saldo esperado','','',money.format(result.expected)],['Diferença','','',differenceLabel]].forEach((row,index)=>countRows.push(pdfTableRow(row,{widths:[145,65,75,101],shade:index>=3,boldCells:index>=3?[0,3]:index===1?[0,3]:[],...rowOpts,rightAlignCells:[1,2,3]})));
+  }else countRows.push(pdfTableRow([['Nenhuma contagem salva'],[''],[''],['']],{widths:[145,65,75,101],...rowOpts}));
+  section=drawSection(rightX,ry,rightW,'CONTAGEM FÍSICA DO DINHEIRO',countRows,'Cédulas, moedas e comparação com o saldo esperado');page2[0]+=section.content;ry=section.y;
+  if(Math.min(ly,ry)<20)console.warn(`Cash-closing summary approaches page edge (left=${ly}, right=${ry}).`);
+  pageContents.push(page2[0]);
+
+  const pageCount=pageContents.length,fontRegularId=3+pageCount*2,fontBoldId=fontRegularId+1,objects=new Array(fontBoldId+1);
+  objects[1]='<< /Type /Catalog /Pages 2 0 R >>';objects[2]=`<< /Type /Pages /Kids [${pageContents.map((_,index)=>`${3+index*2} 0 R`).join(' ')}] /Count ${pageCount} >>`;
+  objects[fontRegularId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';objects[fontBoldId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  pageContents.forEach((pageContent,index)=>{const pageId=3+index*2,streamId=pageId+1;objects[streamId]=`<< /Length ${pageContent.length} >>\nstream\n${pageContent}endstream`;objects[pageId]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${streamId} 0 R >>`});
+  let pdf='%PDF-1.4\n';const offsets=new Array(objects.length).fill(0);for(let id=1;id<objects.length;id++){offsets[id]=pdf.length;pdf+=`${id} 0 obj\n${objects[id]}\nendobj\n`}const xref=pdf.length;pdf+=`xref\n0 ${objects.length}\n0000000000 65535 f \n`;for(let id=1;id<objects.length;id++)pdf+=`${String(offsets[id]).padStart(10,'0')} 00000 n \n`;pdf+=`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;return new Blob([pdf],{type:'application/pdf'});
+}
 async function saveDailyClosingPdf(){
   const filename=`fechamento-caixa-${localDate()}.pdf`,blob=cashClosingPdfBlob();
   if(window.AndroidDownloads&&typeof window.AndroidDownloads.saveToDownloads==='function'){
