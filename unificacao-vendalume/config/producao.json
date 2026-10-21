@@ -3,6 +3,6 @@
   "target": "web",
   "applicationId": "com.clauber.vendasfacil",
   "licenseRequired": true,
-  "historicalCashClosing": false,
+  "historicalCashClosing": true,
   "publishAutomatically": false
 }
