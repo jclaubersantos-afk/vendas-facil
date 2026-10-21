@@ -2,7 +2,7 @@
   "displayName": "Vendalume principal",
   "target": "web",
   "applicationId": "com.clauber.vendasfacil",
-  "licenseRequired": true,
+  "licenseRequired": false,
   "historicalCashClosing": true,
   "publishAutomatically": false
 }
