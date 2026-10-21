@@ -88,8 +88,8 @@ def write_test_zip(test_html: str, config: dict) -> Path:
 def main() -> None:
     production = read_config('producao.json')
     test_config = read_config('teste.json')
-    if not production['licenseRequired'] or not production['historicalCashClosing']:
-        raise ValueError('The future production build must use licenses and historical cash closing.')
+    if not production['historicalCashClosing']:
+        raise ValueError('The principal web build must include historical cash closing.')
     if not test_config['licenseRequired'] or not test_config['historicalCashClosing']:
         raise ValueError('Test configuration must keep test activation and historical closing enabled.')
 
@@ -99,8 +99,10 @@ def main() -> None:
     for marker in shared_markers:
         if marker not in production_html or marker not in test_html:
             raise ValueError(f'Missing shared behavior in a generated variant: {marker}')
-    if 'id="activationForm"' not in production_html or 'id="activationForm"' not in test_html:
-        raise ValueError('The licensing activation screen must be present in both future builds.')
+    if test_config['licenseRequired'] and 'id="activationForm"' not in test_html:
+        raise ValueError('The test build must keep its license activation screen.')
+    if production['licenseRequired'] != ('id="activationForm"' in production_html):
+        raise ValueError('The principal activation screen does not match its configuration.')
     shared_cash_markers = ['id="cashCloseDateSelect"', 'id="exportCashClosingPdf"']
     for marker in shared_cash_markers:
         if marker not in production_html or marker not in test_html:
