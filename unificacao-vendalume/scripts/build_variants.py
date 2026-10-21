@@ -88,23 +88,23 @@ def write_test_zip(test_html: str, config: dict) -> Path:
 def main() -> None:
     production = read_config('producao.json')
     test_config = read_config('teste.json')
-    if not production['licenseRequired'] or production['historicalCashClosing']:
-        raise ValueError('The future production build must use licenses but keep historical closing disabled by default.')
+    if not production['licenseRequired'] or not production['historicalCashClosing']:
+        raise ValueError('The future production build must use licenses and historical cash closing.')
     if not test_config['licenseRequired'] or not test_config['historicalCashClosing']:
         raise ValueError('Test configuration must keep test activation and historical closing enabled.')
 
     production_html = render_html(production)
     test_html = render_html(test_config)
-    shared_markers = ['completedOrderCustomerCode', 'Código do cliente:', 'function cashClosingPdfBlob', 'pageContents.push(page1[0])']
+    shared_markers = ['completedOrderCustomerCode', 'Código do cliente:', 'function cashClosingPdfBlob', 'pageContents.push(page1[0])', 'id="cashCloseDateSelect"', 'id="exportCashClosingPdf"', 'function addPixReceipt()']
     for marker in shared_markers:
         if marker not in production_html or marker not in test_html:
             raise ValueError(f'Missing shared behavior in a generated variant: {marker}')
     if 'id="activationForm"' not in production_html or 'id="activationForm"' not in test_html:
         raise ValueError('The licensing activation screen must be present in both future builds.')
-    test_markup_markers = ['id="cashCloseDateSelect"', 'id="exportCashClosingPdf"']
-    for marker in test_markup_markers:
-        if marker in production_html or marker not in test_html:
-            raise ValueError(f'Test-only UI is included in the wrong build: {marker}')
+    shared_cash_markers = ['id="cashCloseDateSelect"', 'id="exportCashClosingPdf"']
+    for marker in shared_cash_markers:
+        if marker not in production_html or marker not in test_html:
+            raise ValueError(f'Historical cash-closing UI must be included in both builds: {marker}')
     if 'window.VENDALUME_BUILD_CONFIG={"displayName":"Vendalume principal"' not in production_html:
         raise ValueError('The production build config was not inserted correctly.')
 
