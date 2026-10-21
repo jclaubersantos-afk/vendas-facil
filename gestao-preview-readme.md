@@ -1,23 +1,23 @@
-# Vendalume Gestão — versão inicial de validação
+# Vendalume Gestão — versão de validação
 
-Este diretório é a única fonte de código do Vendalume Gestão. O APK de validação é gerado temporariamente a partir desta mesma fonte; não existe um aplicativo Principal e outro Teste mantidos em paralelo.
+O Vendalume Gestão tem uma única fonte de código. O APK de validação é temporário e gerado a partir dessa mesma base; não há um aplicativo Principal e outro Teste mantidos em paralelo.
 
 ## Estado desta etapa
 
-- Painel responsivo em modo escuro, identidade Vendalume Gestão e navegação inicial.
-- Ações de navegação, busca, filtros demonstrativos, código fictício de vínculo e impressão do painel.
-- Todos os indicadores e vendedores exibidos são fictícios e estão identificados como demonstração.
-- Ainda não há login real, banco conectado, vínculo de aparelhos ou sincronização de vendas.
-- O Vendalume Principal e o Supabase não são alterados por esta prévia.
+- Painel responsivo em modo escuro e navegação para equipe, metas, relatórios e aparelhos.
+- Login de gerente com Supabase Auth, criação inicial do negócio e leitura dos dados protegidos por RLS.
+- Cadastro de vendedores, geração de código de vínculo de uso único (armazenado como hash) e gerenciamento de aparelhos.
+- Esta etapa ainda não sincroniza vendas do Vendalume. Até completar a integração do lado vendedor, os relatórios de vendas ficam vazios.
+- A versão instalada anteriormente é apenas a prévia visual; não a use para uma venda real.
+- O Vendalume Principal e sua página publicada não são alterados.
 
 ## Build de validação
 
-O workflow `build-gestao-preview.yml` compila o APK temporário e publica somente um artefato de curta duração do GitHub Actions. Ele não cria release nem executa a build do Vendalume Principal.
+O workflow `build-gestao-preview.yml` compila o APK Android temporário e publica somente um artefato de curta duração do GitHub Actions. Não cria uma release e não executa a build do Vendalume Principal.
 
-## Próximas etapas
+## Antes de liberar venda de teste
 
-1. Revisar a interface e a acessibilidade em celular.
-2. Validar e aplicar, separadamente, o rascunho de esquema do Supabase e as políticas de acesso.
-3. Implementar login do gerente, vínculo de uso único e associação do aparelho ao vendedor.
-4. Integrar a fila offline do Vendalume e a sincronização idempotente de vendas, alterações, cancelamentos e comissões.
-5. Testar isolamento entre negócios, modo offline, relatórios e permissões antes de distribuir a versão de validação.
+1. Conectar o fluxo de vínculo no Vendalume e autenticação anônima do aparelho.
+2. Implementar fila offline idempotente para novas vendas, edições e cancelamentos.
+3. Testar separação entre empresas, códigos de uso único, reenvio offline e relatórios.
+4. Validar os dois aplicativos juntos antes de pedir uma venda descartável.
