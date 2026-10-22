@@ -7,10 +7,12 @@
   const money = n => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n)||0);
   const dateStr = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   let dbClient, manager, business, sellers=[], devices=[], sales=[], goals=[], lastPairCode='', realtime;
-  let toastTimer;
+  let toastTimer, startupDelayTimer;
   function toast(message){const el=$('toast');if(!el)return;el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3200)}
   function setAuthMessage(message,isError=false){const el=$('authMessage');if(el){el.textContent=message;el.style.color=isError?'#f2aaaa':'#a6b2b6'}}
-  function showGate(id){['startupGate','authGate','businessGate'].forEach(x=>{const el=$(x);if(el)el.hidden=x!==id})}
+  function armStartupDelay(){clearTimeout(startupDelayTimer);startupDelayTimer=setTimeout(()=>{const gate=$('startupGate');if(gate&&!gate.hidden)gate.classList.add('has-delay')},12000)}
+  function clearStartupDelay(){clearTimeout(startupDelayTimer);startupDelayTimer=null;$('startupGate')?.classList.remove('has-delay')}
+  function showGate(id){['startupGate','authGate','businessGate'].forEach(x=>{const el=$(x);if(el)el.hidden=x!==id});if(id==='startupGate')armStartupDelay();else clearStartupDelay()}
   function initials(name){return String(name||'?').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()}
   const esc=value=>String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
   function removeDemoLabels(){document.querySelectorAll('.demo-banner,.only-demo').forEach(e=>e.remove())}
@@ -160,6 +162,7 @@
     document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>showView(el.dataset.view)));
     $('sellerSearch')?.addEventListener('input',e=>renderSellerRows(e.target.value));$('period')?.addEventListener('change',()=>loadDashboard().catch(e=>toast(e.message)));
     const topActions=document.querySelector('#overview .top-actions');if(topActions&&!$('refreshDashboard')){const refresh=document.createElement('button');refresh.type='button';refresh.id='refreshDashboard';refresh.className='btn';refresh.textContent='↻ Atualizar';refresh.setAttribute('aria-label','Atualizar dados do Gestão');refresh.onclick=refreshDashboard;topActions.insertBefore(refresh,topActions.querySelector('button')||null)}
+    $('startupFallback')?.addEventListener('click',()=>{showGate('authGate');setAuthMessage('A recuperação automática demorou. Entre novamente; sua conta e seus dados permanecem salvos.',true)})
     const newSeller=document.querySelector('#sellers .topbar .btn.primary');if(newSeller)newSeller.onclick=addSeller;
     const genButtons=document.querySelectorAll('#devices button');genButtons.forEach(b=>{if(b.textContent.toLowerCase().includes('gerar código'))b.onclick=generateCode;if(b.textContent.toLowerCase().includes('copiar código'))b.onclick=copyCode});
     document.querySelectorAll('button').forEach(b=>{if(b.textContent.trim()==='PDF'||b.textContent.includes('Exportar PDF'))b.onclick=printReport});
