@@ -10,7 +10,7 @@
   let toastTimer;
   function toast(message){const el=$('toast');if(!el)return;el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3200)}
   function setAuthMessage(message,isError=false){const el=$('authMessage');if(el){el.textContent=message;el.style.color=isError?'#f2aaaa':'#a6b2b6'}}
-  function showGate(id){['authGate','businessGate'].forEach(x=>{const el=$(x);if(el)el.hidden=x!==id})}
+  function showGate(id){['startupGate','authGate','businessGate'].forEach(x=>{const el=$(x);if(el)el.hidden=x!==id})}
   function initials(name){return String(name||'?').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()}
   const esc=value=>String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
   function removeDemoLabels(){document.querySelectorAll('.demo-banner,.only-demo').forEach(e=>e.remove())}
@@ -126,9 +126,10 @@
     const {data:list,error:berr}=await dbClient.from('gestao_businesses').select('id,code,name,device_limit').in('id',ids);
     if(berr)throw berr;
     if(!list?.length){showGate('businessGate');return}
-    business=list[0];showGate('');removeDemoLabels();
+    business=list[0];showGate('startupGate');removeDemoLabels();
     document.querySelectorAll('.view').forEach(v=>v.dataset.connected='true');
     await loadDashboard();
+    showGate('');
     if(realtime)dbClient.removeChannel(realtime);
     realtime=dbClient.channel(`gestao-${business.id}`).on('postgres_changes',{event:'*',schema:'public',table:'gestao_sales',filter:`business_id=eq.${business.id}`},()=>loadDashboard().catch(e=>toast(e.message))).on('postgres_changes',{event:'*',schema:'public',table:'gestao_sale_items',filter:`business_id=eq.${business.id}`},()=>loadDashboard().catch(e=>toast(e.message))).on('postgres_changes',{event:'*',schema:'public',table:'gestao_sellers',filter:`business_id=eq.${business.id}`},()=>loadDashboard().catch(e=>toast(e.message))).on('postgres_changes',{event:'*',schema:'public',table:'gestao_devices',filter:`business_id=eq.${business.id}`},()=>loadDashboard().catch(e=>toast(e.message))).on('postgres_changes',{event:'*',schema:'public',table:'gestao_goals',filter:`business_id=eq.${business.id}`},()=>loadDashboard().catch(e=>toast(e.message))).subscribe();
   }
@@ -153,6 +154,7 @@
   function showView(id){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===id));window.scrollTo({top:0,behavior:'smooth'})}
   function setup(){
     if(!window.supabase?.createClient){showGate('authGate');setAuthMessage('Não consegui carregar o serviço. Verifique a conexão com a internet e abra novamente.',true);return}
+    showGate('startupGate');
     dbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
     $('authForm')?.addEventListener('submit',signIn);$('signupButton')?.addEventListener('click',signUp);$('businessForm')?.addEventListener('submit',createBusiness);
     document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>showView(el.dataset.view)));
