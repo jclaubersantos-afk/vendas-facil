@@ -1,0 +1,73 @@
+name: Build isolated Vendalume sync-validation APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/vendalume-gestao
+    paths:
+      - 'index.html'
+      - 'vendalume-sync-validation-wrapper.zip'
+      - '.github/workflows/build-sync-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validation branch
+        uses: actions/checkout@v4
+
+      - name: Validate embedded JavaScript
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('No script blocks found');
+          scripts.forEach((m, i) => { if (m[1].trim()) new Function(m[1]); });
+          for (const token of ['gestaoPairButton', 'gestao_claim_pairing_code', 'gestao_sync_sale', '__gestaoSyncOutbox', '__gestaoSyncAcknowledgements']) {
+            if (!html.includes(token)) throw new Error(`Missing sync integration marker: ${token}`);
+          }
+          console.log(`Validated ${scripts.length} JavaScript script block(s)`);
+          NODE
+
+      - name: Prepare isolated Android wrapper and feature-branch page
+        run: |
+          mkdir android
+          unzip -q vendalume-sync-validation-wrapper.zip -d android
+          mkdir -p android/app/src/main/assets
+          cp index.html android/app/src/main/assets/index.html
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android SDK platform and build tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Build isolated seller validation APK
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload temporary APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vendalume-sync-validation-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
