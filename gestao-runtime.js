@@ -61,8 +61,13 @@
   }
   function renderReport(){
     const card=document.querySelector('#reports .card');if(!card)return;
+    const range=rangeForPeriod();
     const grouped=sellers.map(s=>{const ss=sales.filter(x=>x.seller_id===s.id);return {name:s.name,count:ss.length,total:ss.reduce((a,x)=>a+Number(x.total||0),0),commission:ss.reduce((a,x)=>a+Number(x.commission_total||0),0)}}).filter(x=>x.count||sales.length===0).sort((a,b)=>b.total-a.total);
-    card.innerHTML=`<div class="card-head"><div><h2 class="card-title">Resumo por vendedor</h2><div class="card-sub">Período: ${rangeForPeriod().from} a ${rangeForPeriod().to}</div></div></div><div class="table-scroll"><table><thead><tr><th>Vendedor</th><th>Vendas</th><th>Total</th><th>Comissão</th></tr></thead><tbody>${grouped.length?grouped.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.count}</td><td>${money(x.total)}</td><td>${money(x.commission)}</td></tr>`).join(''):'<tr><td colspan="4">Sem vendas no período selecionado.</td></tr>'}</tbody></table></div>`;
+    const products=new Map();
+    sales.forEach(s=>{(s.items||[]).forEach(i=>{const name=String(i.product_name||'Produto sem nome');const row=products.get(name)||{name,quantity:0,total:0,commission:0};row.quantity+=Number(i.quantity||0);row.total+=Number(i.line_total||0);row.commission+=Number(i.commission_per_unit||0)*Number(i.quantity||0);products.set(name,row)})});
+    const productRows=[...products.values()].sort((a,b)=>b.quantity-a.quantity||a.name.localeCompare(b.name,'pt-BR'));
+    const periodLabel=`${range.from} a ${range.to}`;
+    card.innerHTML=`<div class="card-head"><div><h2 class="card-title">Resumo por vendedor</h2><div class="card-sub">Período: ${periodLabel}</div></div></div><div class="table-scroll"><table><thead><tr><th>Vendedor</th><th>Vendas</th><th>Total</th><th>Comissão</th></tr></thead><tbody>${grouped.length?grouped.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.count}</td><td>${money(x.total)}</td><td>${money(x.commission)}</td></tr>`).join(''):'<tr><td colspan="4">Sem vendas no período selecionado.</td></tr>'}</tbody></table></div><div class="card-head" style="margin-top:22px"><div><h2 class="card-title">Produtos vendidos</h2><div class="card-sub">Quantidade e valor total no período</div></div></div><div class="table-scroll"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Valor vendido</th><th>Comissão</th></tr></thead><tbody>${productRows.length?productRows.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.quantity}</td><td>${money(x.total)}</td><td>${money(x.commission)}</td></tr>`).join(''):'<tr><td colspan="4">Sem produtos vendidos no período.</td></tr>'}</tbody></table></div>`;
   }
   function renderChart(){
     const line=document.querySelector('#overview .chart-line'),fill=document.querySelector('#overview .chart-fill');if(!line||!fill)return;
