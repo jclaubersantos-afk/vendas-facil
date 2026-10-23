@@ -26,6 +26,16 @@
 .startup-loading.has-delay .startup-fallback{display:inline-flex}
 .startup-loading.has-delay .startup-delay-message{display:block}
 .startup-delay-message{display:none;color:#a6b2b6;font-size:13px;line-height:1.5;max-width:340px}
+
+.product-report-table{min-width:560px}
+@media(max-width:760px){.product-report-scroll{overflow-x:auto}.product-report-table{min-width:520px}.product-report-table th,.product-report-table td{padding:10px 9px;font-size:11px}.product-report-table th:nth-child(1){min-width:112px}.product-report-table th:nth-child(2){min-width:105px}.product-report-table th:nth-child(3){min-width:52px}.product-report-table th:nth-child(4){min-width:115px}}
+
+/* Todos os avisos toast usam uma única camada global, acima da navegação fixa. */
+#toast.toast{position:fixed;left:50%;bottom:24px;z-index:1000;display:block;box-sizing:border-box;width:max-content;max-width:min(560px,calc(100vw - 28px));max-height:35vh;overflow:auto;margin:0;padding:12px 18px;border:1px solid #405b56;border-radius:14px;background:#edf8f5;color:#132722;font-size:14px;line-height:1.4;font-weight:650;text-align:center;overflow-wrap:anywhere;box-shadow:0 12px 36px #0007;opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,16px);transition:opacity .22s ease,transform .22s ease,visibility .22s ease}
+#toast.toast.show{display:block;opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0)}
+#toast.toast.error{background:#552725;color:#ffe6e3;border-color:#a7534d}
+@media(max-width:760px){#toast.toast{bottom:calc(76px + env(safe-area-inset-bottom,0px));max-width:calc(100vw - 24px);padding:11px 15px;font-size:13px}}
+@media(prefers-reduced-motion:reduce){#toast.toast{transition:none}}
 </style>
 </head>
 <body>
