@@ -99,12 +99,14 @@
   function renderDevices(){
     const box=document.querySelector('#devices .mini-list');if(!box)return;
     const byId=new Map(sellers.map(s=>[s.id,s]));
-    box.innerHTML=devices.length?devices.map(d=>{const s=byId.get(d.seller_id);return `<div class="device-row"><div><strong>${esc(d.device_name||'Aparelho')} • ${esc(s?.name||'Vendedor')}</strong><small>${d.active?'Vinculado':'Desvinculado'} • última sincronização ${d.last_seen_at?new Date(d.last_seen_at).toLocaleString('pt-BR'):'ainda não'}</small></div>${d.active?`<button class="btn small" data-unlink="${d.id}">Desvincular</button>`:'<span class="badge warn">Inativo</span>'}</div>`}).join(''):`<div class="muted">Nenhum aparelho vinculado ainda.</div>`;
+    const active=devices.filter(d=>d.active),history=devices.filter(d=>!d.active);
+    const row=d=>{const seller=byId.get(d.seller_id);return `<div class="device-row"><div><strong>${esc(seller?.name||'Vendedor')} • ${esc(d.device_name||'Aparelho')}</strong><small>${d.active?'Vinculado agora':'Desvinculado (histórico)'} • última sincronização ${d.last_seen_at?new Date(d.last_seen_at).toLocaleString('pt-BR'):'ainda não'}</small></div>${d.active?`<button class="btn small" data-unlink="${d.id}">Desvincular</button>`:'<span class="badge warn">Histórico</span>'}</div>`};
+    box.innerHTML=`<div class="device-group"><div class="card-head"><h3 class="card-title">Ativos agora (${active.length})</h3></div>${active.length?active.map(row).join(''):'<div class="muted">Nenhum aparelho ativo no momento.</div>'}</div><div class="device-group" style="margin-top:18px"><div class="card-head"><h3 class="card-title">Desvinculados — histórico (${history.length})</h3></div>${history.length?history.map(row).join(''):'<div class="muted">Nenhum vínculo antigo registrado.</div>'}</div>`;
     box.querySelectorAll('[data-unlink]').forEach(b=>b.addEventListener('click',()=>unlinkDevice(b.dataset.unlink)));
-    const limit=document.querySelector('#devices .count-pill');if(limit)limit.textContent=`${devices.filter(d=>d.active).length} de ${business.device_limit} aparelhos`;
-    const syncCards=document.querySelectorAll('#overview .bottom-grid .card');const syncRows=syncCards[1]?.querySelectorAll('.device-row strong');if(syncRows?.[0])syncRows[0].textContent=String(sales.length);if(syncRows?.[1])syncRows[1].textContent=String(devices.filter(d=>d.active).length);
+    const limit=document.querySelector('#devices .count-pill');if(limit)limit.textContent=`${active.length} ativos de ${business.device_limit} aparelhos`;
+    const syncCards=document.querySelectorAll('#overview .bottom-grid .card');const syncRows=syncCards[1]?.querySelectorAll('.device-row strong');if(syncRows?.[0])syncRows[0].textContent=String(sales.length);if(syncRows?.[1])syncRows[1].textContent=String(active.length);
     const syncLabels=syncCards[1]?.querySelectorAll('.device-row small');if(syncLabels?.[0])syncLabels[0].textContent='Vendas recebidas neste período';if(syncLabels?.[1])syncLabels[1].textContent='Aparelhos ativos vinculados';
-    const sel=$('pairSellerSelect');if(sel){const activeSellerIds=new Set(devices.filter(d=>d.active).map(d=>d.seller_id));sel.innerHTML='<option value="">Escolha um vendedor</option>'+sellers.filter(s=>s.active&&!activeSellerIds.has(s.id)).map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+    const sel=$('pairSellerSelect');if(sel){const activeSellerIds=new Set(active.map(d=>d.seller_id));sel.innerHTML='<option value="">Escolha um vendedor</option>'+sellers.filter(s=>s.active&&!activeSellerIds.has(s.id)).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
   }
   async function loadDashboard(){
     if(!business||!dbClient)return;
