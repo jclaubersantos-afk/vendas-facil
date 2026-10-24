@@ -3,9 +3,9 @@
   "target": "android-debug",
   "applicationId": "com.clauber.vendasfacil.teste",
   "applicationIdSuffix": ".teste",
-  "licenseRequired": true,
+  "licenseRequired": false,
   "historicalCashClosing": true,
-  "versionCode": 15,
-  "versionName": "1.1.4",
+  "versionCode": 16,
+  "versionName": "1.1.5",
   "publishAutomatically": false
 }
