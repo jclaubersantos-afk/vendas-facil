@@ -162,7 +162,7 @@
     await loadDashboard();toast('Metas salvas.')}
   async function printReport(){window.print()}
   async function signOut(){if(dbClient){if(realtime)dbClient.removeChannel(realtime);await dbClient.auth.signOut()}manager=null;business=null;showGate('authGate')}
-  function showView(id){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===id));window.scrollTo({top:0,behavior:'smooth'})}
+  function showView(id){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===id));const hint=document.querySelector('.mobile-swipe-hint');if(hint){const labels={overview:'Resumo',sellers:'Equipe',goals:'Metas',reports:'Relatórios',devices:'Aparelhos'},order=['overview','sellers','goals','reports','devices'],i=order.indexOf(id);hint.textContent=`${labels[id]||'Resumo'} · ${i>=order.length-1?'deslize para a direita para voltar ←':'deslize para a esquerda para ${labels[order[i+1]]} →'}`}window.scrollTo({top:0,behavior:'smooth'})}
   function setup(){
     if(!window.supabase?.createClient){showGate('authGate');setAuthMessage('Não consegui carregar o serviço. Verifique a conexão com a internet e abra novamente.',true);return}
     showGate('startupGate');
@@ -170,7 +170,7 @@
     $('authForm')?.addEventListener('submit',signIn);$('signupButton')?.addEventListener('click',signUp);$('businessForm')?.addEventListener('submit',createBusiness);
     document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>showView(el.dataset.view)));
     $('sellerSearch')?.addEventListener('input',e=>renderSellerRows(e.target.value));$('period')?.addEventListener('change',()=>loadDashboard().catch(e=>toast(e.message)));
-    const topActions=document.querySelector('#overview .top-actions');if(topActions&&!$('refreshDashboard')){const refresh=document.createElement('button');refresh.type='button';refresh.id='refreshDashboard';refresh.className='btn';refresh.textContent='↻ Atualizar';refresh.setAttribute('aria-label','Atualizar dados do Gestão');refresh.onclick=refreshDashboard;topActions.insertBefore(refresh,topActions.querySelector('button')||null)}
+    const refresh=$('refreshDashboard');if(refresh){refresh.setAttribute('aria-label','Atualizar dados do Gestão');refresh.onclick=refreshDashboard}
     $('startupFallback')?.addEventListener('click',()=>{showGate('authGate');setAuthMessage('A recuperação automática demorou. Entre novamente; sua conta e seus dados permanecem salvos.',true)})
     const newSeller=document.querySelector('#sellers .topbar .btn.primary');if(newSeller)newSeller.onclick=addSeller;
     const genButtons=document.querySelectorAll('#devices button');genButtons.forEach(b=>{if(b.textContent.toLowerCase().includes('gerar código'))b.onclick=generateCode;if(b.textContent.toLowerCase().includes('copiar código'))b.onclick=copyCode});
@@ -178,6 +178,7 @@
     const save=document.querySelector('#goals .topbar .btn.primary');if(save)save.onclick=saveGoals;
     installPairSelector();const limitButton=document.createElement('button');limitButton.className='btn small';limitButton.textContent='Ajustar limite';limitButton.onclick=changeDeviceLimit;const devHead=document.querySelector('#devices .card-head');if(devHead&&!devHead.contains(limitButton))devHead.appendChild(limitButton);
     const userBox=document.querySelector('.user-box');if(userBox){const b=document.createElement('button');b.className='btn small';b.textContent='Sair';b.style.marginLeft='auto';b.onclick=signOut;userBox.appendChild(b)}
+    const viewOrder=['overview','sellers','goals','reports','devices'],swipeArea=document.querySelector('.main');let swipeX=0,swipeY=0;if(swipeArea){swipeArea.addEventListener('touchstart',event=>{if(window.innerWidth>760)return;swipeX=event.changedTouches[0].clientX;swipeY=event.changedTouches[0].clientY},{passive:true});swipeArea.addEventListener('touchend',event=>{if(window.innerWidth>760)return;const dx=event.changedTouches[0].clientX-swipeX,dy=event.changedTouches[0].clientY-swipeY;if(Math.abs(dx)<65||Math.abs(dx)<Math.abs(dy)*1.25)return;const active=document.querySelector('.view.active'),index=viewOrder.indexOf(active?.id);if(index<0)return;const next=Math.max(0,Math.min(viewOrder.length-1,index+(dx<0?1:-1)));if(next!==index)showView(viewOrder[next])},{passive:true})}
     dbClient.auth.getSession().then(async({data,error})=>{if(error){showGate('authGate');setAuthMessage(error.message,true);return}if(data.session){try{await loadManager()}catch(e){showGate('authGate');setAuthMessage(e.message||'Falha ao carregar os dados.',true)}}else showGate('authGate')});
   }
   window.generateCode=generateCode;window.copyCode=copyCode;window.hidePairCode=hidePairCode;window.printReport=printReport;window.showView=showView;window.addSeller=addSeller;
