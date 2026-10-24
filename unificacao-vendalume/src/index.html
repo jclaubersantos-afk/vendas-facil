@@ -603,7 +603,7 @@ function saveSale(){
     if(oldIndex>=0)d.sales[oldIndex]=sale;else d.sales.push(sale);
   },message)){
     sendAppNotification(original?'Venda atualizada':'Venda registrada',`${sale.customerName} • ${money.format(total)}` ,`sale-${sale.id}`);if(lowStockAlerts.length)sendAppNotification('Estoque baixo',lowStockAlerts.join(' • '),'low-stock');
-    editingSaleId='';completedOrderSaleId=original?'':sale.id;saleCart=[];$('saleQty').value='';$('saleCustomer').value='';$('saleSeller').value='';$('saleNote').value='';setSaleDate(localDate());$('salePaymentMethod').value='dinheiro';$('pixAmount').value='';$('saleBadge').textContent='Nova';$('saveSale').textContent='✅ Confirmar venda e baixar estoque';$('cancelSaleEdit').style.display='none';renderSaleCart();updateSaleTotal();renderSelects();renderCompletedOrder();if(!original)$('completedOrderPanel').scrollIntoView({behavior:'smooth',block:'start'});
+    editingSaleId='';completedOrderSaleId=original?'':sale.id;saleCart=[];$('saleQty').value='';$('saleCustomer').value='';$('saleCustomerSearch').value='';$('saleCustomerResults').hidden=true;$('saleCustomerSearch').setAttribute('aria-expanded','false');$('saleSeller').value='';$('saleNote').value='';setSaleDate(localDate());$('salePaymentMethod').value='dinheiro';$('pixAmount').value='';$('saleBadge').textContent='Nova';$('saveSale').textContent='✅ Confirmar venda e baixar estoque';$('cancelSaleEdit').style.display='none';renderSaleCart();updateSaleTotal();renderSelects();renderCompletedOrder();if(!original)$('completedOrderPanel').scrollIntoView({behavior:'smooth',block:'start'});
   }
 }
 function csvCell(value){return `"${text(value).replaceAll('"','""')}"`}
