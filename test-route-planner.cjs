@@ -8,13 +8,13 @@ const begin = source.indexOf('function validCustomerCoords(');
 const end = source.indexOf('function renderCustomers(){', begin);
 if (begin < 0 || end < 0) throw new Error('Route functions not found');
 const routeCode = source.slice(begin, end);
-const exports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart};`)(
+const routeExports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart};`)(
   x => x == null ? '' : String(x),
   (x, fallback=0) => Number.isFinite(Number(x)) ? Number(x) : fallback,
   (a,b) => String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'}),
   id => ({id:'water',name:'Água 20lts',price:7.5,commissionPerUnit:.75})
 );
-const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart} = exports;
+const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart} = routeExports;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const close = (a,b,tol=.3) => Math.abs(a-b) <= tol;
 assert(validCustomerCoords({coords:'-23.55, -46.63'}).lat === -23.55, 'valid negative coordinates');
