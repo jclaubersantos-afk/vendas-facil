@@ -84,7 +84,7 @@ returns boolean language plpgsql security definer set search_path=pg_catalog,pg_
 declare d public.gestao_devices%rowtype; a public.gestao_seller_pin_attempts%rowtype; h text;
 begin
  if auth.uid() is null then raise exception 'active device authorization required' using errcode='42501'; end if;
- if p_pin is null or p_pin !~ '^\d{6}$' then
+ if p_pin is null or length(p_pin)<>6 or p_pin !~ '^[0-9]{6}$' then
    select * into d from public.gestao_devices where auth_user_id=auth.uid() and active=true;
    if not found then raise exception 'active device authorization required' using errcode='42501'; end if;
    insert into public.gestao_seller_pin_attempts(device_id,failed_attempts,last_failed_at,updated_at) values(d.id,1,now(),now())
