@@ -22,7 +22,7 @@ assert(validCustomerCoords({coords:'91,0'}) === null, 'reject out-of-range latit
 assert(validCustomerCoords({coords:'0,181'}) === null, 'reject out-of-range longitude');
 assert(validCustomerCoords({coords:'abc'}) === null, 'reject malformed coordinates');
 assert(close(haversineKm({lat:0,lng:0},{lat:0,lng:1}),111.19,.4), 'haversine degree distance');
-const A={id:'A',name:'A',coords:'0,0'}, B={id:'B',name:'B',coords:'0,1'}, C={id:'C',name:'C',coords:'0,2'}, far={id:'F',name:'F',coords:'10,10'};
+const A={id:'A',name:'A',coords:'0,0'}, B={id:'B',name:'B',coords:'0,1'}, C={id:'C',name:'C',coords:'0,2'};
 let r=calculateRouteOrder([A,B,C],'C');
 assert(r.ordered.map(x=>x.id).join(',')==='C,B,A', 'nearest-neighbor chosen start and next stops');
 assert(close(r.distance,222.39,.6), 'approximate consecutive distance');
