@@ -1,5 +1,6 @@
--- REVIEWED DRAFT ONLY — NOT EXECUTED. Schema checked read-only against the current
--- production project on 2026-10-28. Keep unexecuted until PIN flow tests and explicit production approval.
+-- REVIEWED DRAFT ONLY — NOT EXECUTED. SQL grammar and referenced schema checked read-only
+-- against the current production project on 2026-10-28. No test-project credentials included.
+-- Keep unexecuted until isolated PIN flow tests and explicit production approval.
 -- No PIN columns are added to gestao_sellers: its seller RLS must not expose PIN data.
 -- Verified in the current project: gestao_memberships(user_id,business_id,role,active),
 -- gestao_sellers(id,business_id,active) with UNIQUE(business_id,id), and
@@ -31,8 +32,8 @@ create table if not exists public.gestao_seller_pin_attempts (
 );
 alter table public.gestao_seller_pin_credentials enable row level security;
 alter table public.gestao_seller_pin_attempts enable row level security;
-revoke all on public.gestao_seller_pin_credentials from public,anon,authenticated,service_role;
-revoke all on public.gestao_seller_pin_attempts from public,anon,authenticated,service_role;
+revoke all on public.gestao_seller_pin_credentials from public,anon,authenticated;
+revoke all on public.gestao_seller_pin_attempts from public,anon,authenticated;
 
 -- Owner-only PIN generation/rotation (confirmed active roles in current project). The generated six-digit PIN is returned
 -- once; only a bcrypt hash is stored. Salt returned for client-side PBKDF2-SHA256
