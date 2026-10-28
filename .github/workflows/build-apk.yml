@@ -8,7 +8,82 @@ on:
 
 permissions:
   contents: write
+name: Build isolated Vendalume PIN-lock APKs
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/pin-lock-isolated
+    paths:
+      - 'android-project.zip'
+      - 'gestao-android-wrapper.zip'
+      - 'index.html'
+      - 'gestao-index.html'
+      - 'gestao-runtime.js'
+      - '.github/workflows/build-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/feature/pin-lock-isolated'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate embedded source scripts
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          for (const [file, external] of [['index.html', false], ['gestao-index.html', true]]) {
+            const html = fs.readFileSync(file, 'utf8');
+            if (external && !html.includes('src="./gestao-runtime.js"')) throw new Error('Manager runtime link missing');
+            const blocks = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+            for (const [i, m] of blocks.entries()) if (m[1].trim()) new Function(m[1]);
+            console.log(`${file}: ${blocks.length} script blocks syntax-checked`);
+          }
+          new Function(fs.readFileSync('gestao-runtime.js','utf8'));
+          for (const file of ['index.html','gestao-runtime.js']) {
+            const source = fs.readFileSync(file,'utf8');
+            if (source.includes('zifubexfqkzlqrpjqdul') || source.includes('sb_publishable_nAk87ogyQHbQaJTD5hpTGA_H0ZfzeyA')) throw new Error('Production Supabase endpoint/key found');
+          }
+          NODE
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android platform and Gradle
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+      - name: Build isolated seller APK from embedded feature source
+        run: |
+          mkdir seller-build && unzip -q android-project.zip -d seller-build
+          mkdir -p seller-build/app/src/main/assets
+          cp index.html seller-build/app/src/main/assets/index.html
+          cd seller-build && gradle --no-daemon assembleDebug
+      - name: Build isolated manager APK from embedded feature source
+        run: |
+          mkdir manager-build && unzip -q gestao-android-wrapper.zip -d manager-build
+          mkdir -p manager-build/app/src/main/assets
+          cp gestao-index.html manager-build/app/src/main/assets/index.html
+          cp gestao-runtime.js manager-build/app/src/main/assets/gestao-runtime.js
+          cd manager-build && gradle --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vendalume-pin-lock-isolated-apks
+          path: |
+            seller-build/app/build/outputs/apk/debug/app-debug.apk
+            manager-build/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
 jobs:
   build:
     runs-on: ubuntu-latest
