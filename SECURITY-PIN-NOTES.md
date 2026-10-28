@@ -1,0 +1,13 @@
+# PIN screen-lock feature — isolation/security notes
+
+This branch contains an isolated prototype only. No database migration was executed and no APK/build/release was produced.
+
+Both locks are local privacy/access deterrents, not a replacement for account authentication. The manager's PIN verifier is local PBKDF2-SHA-256; local attempt delays can be reset by clearing app/browser data. Clearing app data removes this local lock. The manager remains signed in. The seller PIN verifier is fetched only for the active business/seller/device binding. A cached six-digit verifier in browser storage is crackable and modifiable by someone with device/storage access; a client-only offline retry counter can be bypassed. Do not describe the PIN as secure authentication, or rely on offline checking to protect sensitive data. Server authorization and online attempt controls require the reviewed migration and testing first. The isolated branch has no test-project publishable key: the previous production Supabase URL/key were removed and a placeholder remains, so synchronization/PIN RPCs will not work until the correct isolated test credentials are injected securely (never commit them).
+
+The migration draft uses a separate private PIN table (not `gestao_sellers`), with no direct grants to anon/authenticated and explicit active membership role checks (`owner`/`manager`) in each manager RPC. Seller verifier fetch derives the exact active device from `auth.uid()`. It must be reviewed against the isolated test project's actual schema, permissions and RLS before any test deployment. Never execute it against production.
+
+The seller outbox is kept in place on lock and on identity mismatch. A pending row can be sent only if its immutable `business_id`, `seller_id`, and `device_id` match the currently linked profile. Legacy rows without those identifiers are preserved and refused, not auto-bound or discarded. The app does not log out, unlink, clear sales or stop the background session when locking.
+
+The existing APK workflow is unsafe for isolated changes: it has no branch condition, triggers on `android-project.zip` pushes across branches, and publishes a fixed release tag. Do not trigger it for this work. No production/Pages source or production device/database was touched. The Supabase test project's current relation to this branch was not independently verified.
+
+The manager UI's “Gerar/renovar PIN” action calls only the manager-authorization RPCs in the draft: it does not store or edit PIN fields in `gestao_sellers`. If those reviewed RPCs are not installed, generation fails closed with an error. The app workflows deliberately do not build on this branch automatically.
