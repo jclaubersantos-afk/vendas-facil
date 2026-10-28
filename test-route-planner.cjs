@@ -8,13 +8,13 @@ const begin = source.indexOf('function validCustomerCoords(');
 const end = source.indexOf('function renderCustomers(){', begin);
 if (begin < 0 || end < 0) throw new Error('Route functions not found');
 const routeCode = source.slice(begin, end);
-const routeExports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart};`)(
+const routeExports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart,summarizeRouteForecasts};`)(
   x => x == null ? '' : String(x),
   (x, fallback=0) => Number.isFinite(Number(x)) ? Number(x) : fallback,
   (a,b) => String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'}),
   id => ({id:'water',name:'Água 20lts',price:7.5,commissionPerUnit:.75})
 );
-const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart} = routeExports;
+const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart,summarizeRouteForecasts} = routeExports;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const close = (a,b,tol=.3) => Math.abs(a-b) <= tol;
 assert(validCustomerCoords({coords:'-23.55, -46.63'}).lat === -23.55, 'valid negative coordinates');
@@ -62,7 +62,12 @@ assert(routeForecastTotal(forecasts.C)===75,'forecast total is only an estimate'
 const draftCart=routeForecastToSaleCart.call(null,forecasts.C);
 assert(draftCart.length===1&&draftCart[0].total===75 && draftCart[0].unitPrice===7.5,'arrival creates editable cart draft with forecast line total');
 assert(!payloadCode.includes('plannedOrders')&&!payloadCode.includes('routeForecast'),'forecast never enters the Gestão sync payload');
-assert(source.includes('delete routeState.plannedOrders[String(current.id)]'),'forecast clears only after completed sale advances route');
+assert(!source.includes('delete routeState.plannedOrders[String(current.id)]'),'forecast remains for summary after completed sale');
 assert(source.includes('Salvar previsão neste aparelho')||source.includes('Previsão salva neste aparelho'),'forecast is explicitly local and not a sale');
+const multiCustomerForecasts={A:{items:[{productId:'water',productName:'Água 20lts',quantity:20},{productId:'cup',productName:'Copo 200 ml',quantity:5}]},B:{items:[{productId:'water',productName:'Água 20lts',quantity:20}]},C:{items:[{productId:'water',productName:'Água 20lts',quantity:20},{productId:'cup',productName:'Copo 200 ml',quantity:2}]}};
+const routeTotals=summarizeRouteForecasts(multiCustomerForecasts);
+assert(routeTotals.find(x=>x.productId==='water').quantity===60,'route totals sum product forecast across all stops');
+assert(routeTotals.find(x=>x.productId==='cup').quantity===7,'route totals independently sum each additional product');
+assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexOf('function enqueueGestaoSale(')).includes('plannedOrders'),'forecast stays outside sync payload');
 
-console.log('Route planner tests passed: route ordering, maps, day-local persistence, planned-order filtering, estimate total, editable arrival draft, no sync leakage, and clearing after completed sale.');
+console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
