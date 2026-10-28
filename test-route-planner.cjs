@@ -8,12 +8,13 @@ const begin = source.indexOf('function validCustomerCoords(');
 const end = source.indexOf('function renderCustomers(){', begin);
 if (begin < 0 || end < 0) throw new Error('Route functions not found');
 const routeCode = source.slice(begin, end);
-const exports = new Function('text', 'num', 'compareCustomerNames', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl};`)(
+const exports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart};`)(
   x => x == null ? '' : String(x),
   (x, fallback=0) => Number.isFinite(Number(x)) ? Number(x) : fallback,
-  (a,b) => String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'})
+  (a,b) => String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'}),
+  id => ({id:'water',name:'Água 20lts',price:7.5,commissionPerUnit:.75})
 );
-const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl} = exports;
+const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart} = exports;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const close = (a,b,tol=.3) => Math.abs(a-b) <= tol;
 assert(validCustomerCoords({coords:'-23.55, -46.63'}).lat === -23.55, 'valid negative coordinates');
@@ -50,4 +51,18 @@ const payloadStart=source.indexOf('function buildGestaoOutbox('), payloadEnd=sou
 assert(payloadStart>=0 && payloadEnd>payloadStart, 'sync payload builder exists');
 const payloadCode=source.slice(payloadStart,payloadEnd);
 assert(!payloadCode.includes('routeState') && !payloadCode.includes('ROUTE_DAY_KEY'), 'route fields are absent from Gestão sync payload builder');
-console.log('Route planner tests passed: coordinate validation, Haversine, chosen start, nearest-neighbor order, mixed/manual stops, selected subset, Maps destination fallback, local per-day state, stale customers, and sync-payload separation.');
+
+const products=[{id:'water',name:'Água 20lts',price:7.5,commissionPerUnit:.75},{id:'cup',name:'Copo',price:2,commissionPerUnit:0}];
+const rawForecast={C:{items:[{productId:'water',quantity:10},{productId:'cup',quantity:0},{productId:'missing',quantity:4}],updatedAt:'2026-10-28T00:00:00Z'},gone:{items:[{productId:'water',quantity:2}]}};
+const forecasts=sanitizeRouteForecastOrders(rawForecast,['C'],products);
+assert(forecasts.C.items.length===1&&forecasts.C.items[0].quantity===10,'route forecast keeps valid products and quantities only');
+assert(!forecasts.gone,'forecast for deleted/nonexistent customer is pruned');
+assert(forecasts.C.items[0].unitPrice===7.5,'forecast price refreshes from current catalog');
+assert(routeForecastTotal(forecasts.C)===75,'forecast total is only an estimate');
+const draftCart=routeForecastToSaleCart.call(null,forecasts.C);
+assert(draftCart.length===1&&draftCart[0].total===75 && draftCart[0].unitPrice===7.5,'arrival creates editable cart draft with forecast line total');
+assert(!payloadCode.includes('plannedOrders')&&!payloadCode.includes('routeForecast'),'forecast never enters the Gestão sync payload');
+assert(source.includes('delete routeState.plannedOrders[String(current.id)]'),'forecast clears only after completed sale advances route');
+assert(source.includes('Salvar previsão neste aparelho')||source.includes('Previsão salva neste aparelho'),'forecast is explicitly local and not a sale');
+
+console.log('Route planner tests passed: route ordering, maps, day-local persistence, planned-order filtering, estimate total, editable arrival draft, no sync leakage, and clearing after completed sale.');
