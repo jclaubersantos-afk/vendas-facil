@@ -79,6 +79,8 @@ assert(pdfRows.rows[0].customerCode==='001'&&pdfRows.rows[0].customerName==='Cli
 assert(pdfRows.totals.find(x=>x.productId==='water').quantity===60&&pdfRows.totals.find(x=>x.productId==='cup').quantity===7,'PDF totals match selected route forecast totals');
 assert(source.includes('function routeForecastPdfLines()')&&source.includes('ITENS PREVISTOS POR CLIENTE')&&source.includes('TOTAIS PREVISTOS POR PRODUTO'),'PDF report labels and summaries are generated');
 assert(source.includes('Salvar previsão da rota em PDF')&&source.includes('saveRouteForecastPdf'),'PDF save button appears from route forecast');
+assert(source.includes("pdfBlobFromLines(routeForecastPdfLines(),'portrait')"),'route forecast PDF uses portrait orientation');
+assert(source.includes('widths=[70,155,190,84]'),'portrait table columns are compact and fit the page');
 assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexOf('function enqueueGestaoSale(')).includes('plannedOrders'),'forecast stays outside sync payload');
 
 console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
