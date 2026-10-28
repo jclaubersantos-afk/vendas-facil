@@ -1,14 +1,10 @@
--- REVIEWED DRAFT ONLY — NOT EXECUTED. SQL grammar and referenced schema checked read-only
--- against the current production project on 2026-10-28. No test-project credentials included.
--- Keep unexecuted until isolated PIN flow tests and explicit production approval.
--- No PIN columns are added to gestao_sellers: its seller RLS must not expose PIN data.
--- Verified in the current project: gestao_memberships(user_id,business_id,role,active),
--- gestao_sellers(id,business_id,active) with UNIQUE(business_id,id), and
--- gestao_devices(id,business_id,seller_id,auth_user_id,active) with UNIQUE(auth_user_id).
--- Active membership role observed is owner. pgcrypto is installed in the extensions schema;
--- all SECURITY DEFINER functions use a pg_catalog-only search_path and qualify pgcrypto.
+begin;
 
-create extension if not exists pgcrypto;
+-- PIN migration: additive-only objects, schema reviewed against the active Supabase project 2026-10-28.
+-- Creates private PIN metadata and restricted RPCs; does not modify sales, customers, devices,
+-- memberships, or existing business records. Apply only to the approved project.
+
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.gestao_seller_pin_credentials (
   business_id uuid not null,
@@ -132,3 +128,5 @@ grant execute on function public.gestao_set_seller_pin_offline_verifier(uuid,uui
 grant execute on function public.gestao_get_seller_pin_verifier(uuid,uuid,uuid) to authenticated;
 grant execute on function public.gestao_note_seller_pin_failure(uuid) to authenticated;
 grant execute on function public.gestao_verify_seller_pin(text) to authenticated;
+
+commit;
