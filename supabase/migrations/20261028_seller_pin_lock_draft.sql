@@ -58,7 +58,7 @@ create or replace function public.gestao_set_seller_pin_offline_verifier(p_busin
 returns void language plpgsql security definer set search_path=public,pg_temp as $$
 begin
  if auth.uid() is null or not exists(select 1 from public.gestao_memberships m where m.user_id=auth.uid() and m.business_id=p_business_id and m.active=true and m.role in ('owner','manager')) then raise exception 'manager authorization required' using errcode='42501'; end if;
- if p_verifier_hex !~ '^[0-9a-f]{64}$' then raise exception 'invalid verifier'; end if;
+ if p_verifier_hex is null or p_verifier_hex !~ '^[0-9a-f]{64}$' then raise exception 'invalid verifier'; end if;
  update public.gestao_seller_pin_credentials set offline_pbkdf2_hash_hex=p_verifier_hex where business_id=p_business_id and seller_id=p_seller_id and revision=p_revision;
  if not found then raise exception 'PIN rotation changed or seller not found'; end if;
 end $$;
@@ -94,7 +94,7 @@ begin
    return true;
  end if;
  insert into public.gestao_seller_pin_attempts(device_id,failed_attempts,last_failed_at,updated_at) values(d.id,1,now(),now())
- on conflict(device_id) do update set failed_attempts=case when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then 1 else gestao_seller_pin_attempts.failed_attempts+1 end,last_failed_at=now(),updated_at=now(),blocked_until=case when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then null when gestao_seller_pin_attempts.failed_attempts+1>=5 then now()+least(interval '15 minutes',interval '30 seconds'*power(2,greatest(0,least(5,gestao_seller_pin_attempts.failed_attempts-4)))) else gestao_seller_pin_attempts.blocked_until end;
+ on conflict(device_id) do update set failed_attempts=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.failed_attempts when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then 1 else gestao_seller_pin_attempts.failed_attempts+1 end,last_failed_at=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.last_failed_at else now() end,updated_at=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.updated_at else now() end,blocked_until=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.blocked_until when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then null when gestao_seller_pin_attempts.failed_attempts+1>=5 then now()+least(interval '15 minutes',interval '30 seconds'*power(2,greatest(0,least(5,gestao_seller_pin_attempts.failed_attempts-4)))) else null end;
  return false;
 end $$;
 
@@ -106,8 +106,9 @@ declare d public.gestao_devices%rowtype;
 begin
  select * into d from public.gestao_devices where id=p_device_id and auth_user_id=auth.uid() and active=true;
  if not found then raise exception 'active device authorization required' using errcode='42501'; end if;
+ if exists(select 1 from public.gestao_seller_pin_attempts a where a.device_id=d.id and a.blocked_until>now()) then return; end if;
  insert into public.gestao_seller_pin_attempts(device_id,failed_attempts,last_failed_at,updated_at) values(d.id,1,now(),now())
- on conflict(device_id) do update set failed_attempts=case when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then 1 else gestao_seller_pin_attempts.failed_attempts+1 end,last_failed_at=now(),updated_at=now(),blocked_until=case when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then null when gestao_seller_pin_attempts.failed_attempts+1>=5 then now()+least(interval '15 minutes',interval '30 seconds'*power(2,greatest(0,least(5,gestao_seller_pin_attempts.failed_attempts-4)))) else gestao_seller_pin_attempts.blocked_until end;
+ on conflict(device_id) do update set failed_attempts=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.failed_attempts when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then 1 else gestao_seller_pin_attempts.failed_attempts+1 end,last_failed_at=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.last_failed_at else now() end,updated_at=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.updated_at else now() end,blocked_until=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.blocked_until when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then null when gestao_seller_pin_attempts.failed_attempts+1>=5 then now()+least(interval '15 minutes',interval '30 seconds'*power(2,greatest(0,least(5,gestao_seller_pin_attempts.failed_attempts-4)))) else null end;
 end $$;
 
 revoke all on function public.gestao_generate_seller_pin(uuid,uuid) from public,anon;
