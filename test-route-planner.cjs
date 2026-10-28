@@ -43,7 +43,7 @@ assert(source.includes('function moveManualRouteStop'), 'manual stops can be reo
 const routeRenderStart=source.indexOf('function renderRouteResult(){'),routeRenderEnd=source.indexOf('function renderCustomers(){',routeRenderStart),routeRender=source.slice(routeRenderStart,routeRenderEnd);
 assert(routeRender.includes('row.append(forecastBox)')&&!routeRender.includes('box.append(forecastBox)'), 'forecast and edit control render inside the same customer card');
 assert(routeRender.indexOf('box.append(summary)')>routeRender.indexOf('ordered.forEach'), 'route-wide forecast totals render after the final customer card');
-assert(source.includes('.route-forecast-inline{')&&source.includes('border:0'), 'inline forecast has no separate surrounding card border');
+assert(html.includes('.route-forecast-inline{')&&html.includes('border:0'), 'inline forecast has no separate surrounding card border');
 const mix=calculateRouteOrder([B,no,C],'B');
 assert(mix.ordered.map(x=>x.id).join(',')==='B,C,N', 'mixed coordinate/manual stops');
 assert(customerDirectionsUrl({coords:'-23.5,-46.6',address:'Rua A'}).includes(encodeURIComponent('-23.5,-46.6')), 'maps uses coordinates first');
