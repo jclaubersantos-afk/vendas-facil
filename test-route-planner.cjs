@@ -8,13 +8,13 @@ const begin = source.indexOf('function validCustomerCoords(');
 const end = source.indexOf('function renderCustomers(){', begin);
 if (begin < 0 || end < 0) throw new Error('Route functions not found');
 const routeCode = source.slice(begin, end);
-const routeExports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart,summarizeRouteForecasts};`)(
+const routeExports = new Function('text', 'num', 'compareCustomerNames', 'productById', `${routeCode}\nreturn {validCustomerCoords,haversineKm,calculateRouteOrder,customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart,summarizeRouteForecasts,buildRouteForecastReportRows};`)(
   x => x == null ? '' : String(x),
   (x, fallback=0) => Number.isFinite(Number(x)) ? Number(x) : fallback,
   (a,b) => String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'}),
   id => ({id:'water',name:'Água 20lts',price:7.5,commissionPerUnit:.75})
 );
-const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart,summarizeRouteForecasts} = routeExports;
+const {validCustomerCoords, haversineKm, calculateRouteOrder, customerDirectionsUrl,sanitizeRouteForecastOrders,routeForecastTotal,routeForecastToSaleCart,summarizeRouteForecasts,buildRouteForecastReportRows} = routeExports;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const close = (a,b,tol=.3) => Math.abs(a-b) <= tol;
 assert(validCustomerCoords({coords:'-23.55, -46.63'}).lat === -23.55, 'valid negative coordinates');
@@ -72,6 +72,13 @@ const multiCustomerForecasts={A:{items:[{productId:'water',productName:'Água 20
 const routeTotals=summarizeRouteForecasts(multiCustomerForecasts);
 assert(routeTotals.find(x=>x.productId==='water').quantity===60,'route totals sum product forecast across all stops');
 assert(routeTotals.find(x=>x.productId==='cup').quantity===7,'route totals independently sum each additional product');
+const sampleRouteCustomers=[{id:'A',code:'001',name:'Cliente A'},{id:'B',code:'014',name:'Cliente B'},{id:'C',code:'027',name:'Cliente C'}];
+const pdfRows=buildRouteForecastReportRows(sampleRouteCustomers,multiCustomerForecasts);
+assert(pdfRows.rows.length===5,'PDF row per product forecast');
+assert(pdfRows.rows[0].customerCode==='001'&&pdfRows.rows[0].customerName==='Cliente A'&&pdfRows.rows[1].customerCode===''&&pdfRows.rows[1].customerName==='','PDF lists each customer and code only once for multiple products');
+assert(pdfRows.totals.find(x=>x.productId==='water').quantity===60&&pdfRows.totals.find(x=>x.productId==='cup').quantity===7,'PDF totals match selected route forecast totals');
+assert(source.includes('function routeForecastPdfLines()')&&source.includes('ITENS PREVISTOS POR CLIENTE')&&source.includes('TOTAIS PREVISTOS POR PRODUTO'),'PDF report labels and summaries are generated');
+assert(source.includes('Salvar previsão da rota em PDF')&&source.includes('saveRouteForecastPdf'),'PDF save button appears from route forecast');
 assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexOf('function enqueueGestaoSale(')).includes('plannedOrders'),'forecast stays outside sync payload');
 
 console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
