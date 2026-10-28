@@ -98,8 +98,6 @@ begin
  select * into d from public.gestao_devices where auth_user_id=auth.uid() and active=true;
  if not found then raise exception 'active device authorization required' using errcode='42501'; end if;
  select * into a from public.gestao_seller_pin_attempts where device_id=d.id;
- if found and a.blocked_until>now() then return false; end if;
- select * into a from public.gestao_seller_pin_attempts where device_id=d.id;
  if found and a.blocked_until is not null and a.blocked_until>now() then return false; end if;
  select bcrypt_hash into h from public.gestao_seller_pin_credentials where business_id=d.business_id and seller_id=d.seller_id;
  if h is not null and extensions.crypt(p_pin,h)=h then
