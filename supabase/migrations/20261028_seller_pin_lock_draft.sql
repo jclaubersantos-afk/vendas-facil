@@ -1,10 +1,11 @@
--- REVIEW DRAFT ONLY — NOT EXECUTED. Review against the isolated project's actual
--- schema and deploy to a disposable test project only after approval.
+-- REVIEWED DRAFT ONLY — NOT EXECUTED. Schema checked read-only against the current
+-- production project on 2026-10-28. Keep unexecuted until PIN flow tests and explicit production approval.
 -- No PIN columns are added to gestao_sellers: its seller RLS must not expose PIN data.
--- Assumptions based on this branch: gestao_memberships(user_id,business_id,role,active),
--- gestao_sellers(id,business_id,active), gestao_devices(id,business_id,seller_id,
--- auth_user_id,active). Explicit manager role checks are intentional; do not replace
--- them with gestao_is_manager, which does not enforce role.
+-- Verified in the current project: gestao_memberships(user_id,business_id,role,active),
+-- gestao_sellers(id,business_id,active) with UNIQUE(business_id,id), and
+-- gestao_devices(id,business_id,seller_id,auth_user_id,active) with UNIQUE(auth_user_id).
+-- Active membership role observed is owner. pgcrypto is installed in the extensions schema;
+-- all SECURITY DEFINER functions use a pg_catalog-only search_path and qualify pgcrypto.
 
 create extension if not exists pgcrypto;
 
@@ -30,23 +31,23 @@ create table if not exists public.gestao_seller_pin_attempts (
 );
 alter table public.gestao_seller_pin_credentials enable row level security;
 alter table public.gestao_seller_pin_attempts enable row level security;
-revoke all on public.gestao_seller_pin_credentials from public,anon,authenticated;
-revoke all on public.gestao_seller_pin_attempts from public,anon,authenticated;
+revoke all on public.gestao_seller_pin_credentials from public,anon,authenticated,service_role;
+revoke all on public.gestao_seller_pin_attempts from public,anon,authenticated,service_role;
 
--- Manager-only PIN generation/rotation. The generated six-digit PIN is returned
+-- Owner-only PIN generation/rotation (confirmed active roles in current project). The generated six-digit PIN is returned
 -- once; only a bcrypt hash is stored. Salt returned for client-side PBKDF2-SHA256
 -- offline verifier (600,000 iterations). Increment revision invalidates old caches.
 create or replace function public.gestao_generate_seller_pin(p_business_id uuid,p_seller_id uuid)
 returns table(pin text,offline_salt_hex text,revision bigint)
-language plpgsql security definer set search_path=public,extensions,pg_temp as $$
+language plpgsql security definer set search_path=pg_catalog,pg_temp as $$
 declare v_pin text; v_salt text; v_revision bigint; v_rand bytea;
 begin
- if auth.uid() is null or not exists(select 1 from public.gestao_memberships m where m.user_id=auth.uid() and m.business_id=p_business_id and m.active=true and m.role in ('owner','manager')) then raise exception 'manager authorization required' using errcode='42501'; end if;
+ if auth.uid() is null or not exists(select 1 from public.gestao_memberships m where m.user_id=auth.uid() and m.business_id=p_business_id and m.active=true and m.role='owner') then raise exception 'manager authorization required' using errcode='42501'; end if;
  if not exists(select 1 from public.gestao_sellers s where s.business_id=p_business_id and s.id=p_seller_id and s.active=true) then raise exception 'active seller not found'; end if;
  if not exists(select 1 from public.gestao_devices d where d.business_id=p_business_id and d.seller_id=p_seller_id and d.active=true) then raise exception 'active bound seller device required'; end if;
- loop v_rand:=gen_random_bytes(4); exit when ((get_byte(v_rand,0)::bigint*16777216)+(get_byte(v_rand,1)::bigint*65536)+(get_byte(v_rand,2)::bigint*256)+get_byte(v_rand,3)::bigint)<4294000000; end loop; v_pin:=lpad((((get_byte(v_rand,0)::bigint*16777216)+(get_byte(v_rand,1)::bigint*65536)+(get_byte(v_rand,2)::bigint*256)+get_byte(v_rand,3)::bigint) % 1000000)::text,6,'0'); v_salt:=encode(gen_random_bytes(16),'hex');
+ loop v_rand:=extensions.gen_random_bytes(4); exit when ((get_byte(v_rand,0)::bigint*16777216)+(get_byte(v_rand,1)::bigint*65536)+(get_byte(v_rand,2)::bigint*256)+get_byte(v_rand,3)::bigint)<4294000000; end loop; v_pin:=lpad((((get_byte(v_rand,0)::bigint*16777216)+(get_byte(v_rand,1)::bigint*65536)+(get_byte(v_rand,2)::bigint*256)+get_byte(v_rand,3)::bigint) % 1000000)::text,6,'0'); v_salt:=encode(extensions.gen_random_bytes(16),'hex');
  insert into public.gestao_seller_pin_credentials(business_id,seller_id,bcrypt_hash,offline_salt_hex,offline_pbkdf2_hash_hex,revision,rotated_at,rotated_by)
- values(p_business_id,p_seller_id,crypt(v_pin,gen_salt('bf',12)),v_salt,null,1,now(),auth.uid())
+ values(p_business_id,p_seller_id,extensions.crypt(v_pin,extensions.gen_salt('bf',12)),v_salt,null,1,now(),auth.uid())
  on conflict(business_id,seller_id) do update set bcrypt_hash=excluded.bcrypt_hash,offline_salt_hex=excluded.offline_salt_hex,offline_pbkdf2_hash_hex=null,revision=public.gestao_seller_pin_credentials.revision+1,rotated_at=now(),rotated_by=auth.uid()
  returning public.gestao_seller_pin_credentials.revision into v_revision;
  return query select v_pin,v_salt,v_revision;
@@ -55,9 +56,11 @@ end $$;
 -- Called by manager after calculating PBKDF2 from the one-time PIN and salt.
 -- Server keeps the only fetchable offline verifier alongside the bcrypt hash.
 create or replace function public.gestao_set_seller_pin_offline_verifier(p_business_id uuid,p_seller_id uuid,p_revision bigint,p_verifier_hex text)
-returns void language plpgsql security definer set search_path=public,pg_temp as $$
+returns void language plpgsql security definer set search_path=pg_catalog,pg_temp as $$
 begin
- if auth.uid() is null or not exists(select 1 from public.gestao_memberships m where m.user_id=auth.uid() and m.business_id=p_business_id and m.active=true and m.role in ('owner','manager')) then raise exception 'manager authorization required' using errcode='42501'; end if;
+ if auth.uid() is null or not exists(select 1 from public.gestao_memberships m where m.user_id=auth.uid() and m.business_id=p_business_id and m.active=true and m.role='owner') then raise exception 'manager authorization required' using errcode='42501'; end if;
+ if not exists(select 1 from public.gestao_sellers s where s.business_id=p_business_id and s.id=p_seller_id and s.active=true) then raise exception 'active seller not found'; end if;
+ if not exists(select 1 from public.gestao_devices d where d.business_id=p_business_id and d.seller_id=p_seller_id and d.active=true) then raise exception 'active bound seller device required'; end if;
  if p_verifier_hex is null or p_verifier_hex !~ '^[0-9a-f]{64}$' then raise exception 'invalid verifier'; end if;
  update public.gestao_seller_pin_credentials set offline_pbkdf2_hash_hex=p_verifier_hex where business_id=p_business_id and seller_id=p_seller_id and revision=p_revision;
  if not found then raise exception 'PIN rotation changed or seller not found'; end if;
@@ -67,7 +70,7 @@ end $$;
 -- IDs must match that active device. Returns only salt, PBKDF2 verifier and revision.
 create or replace function public.gestao_get_seller_pin_verifier(p_business_id uuid,p_seller_id uuid,p_device_id uuid)
 returns table(salt_hex text,verifier_hex text,version bigint)
-language plpgsql security definer set search_path=public,pg_temp as $$
+language plpgsql security definer set search_path=pg_catalog,pg_temp as $$
 declare d public.gestao_devices%rowtype; a public.gestao_seller_pin_attempts%rowtype;
 begin
  select * into d from public.gestao_devices where id=p_device_id and auth_user_id=auth.uid() and active=true and business_id=p_business_id and seller_id=p_seller_id;
@@ -80,16 +83,25 @@ end $$;
 -- Online verifier: server-side bcrypt check and enforced lockout. The seller's
 -- device is derived from auth.uid(); it cannot ask for another seller's PIN.
 create or replace function public.gestao_verify_seller_pin(p_pin text)
-returns boolean language plpgsql security definer set search_path=public,extensions,pg_temp as $$
-declare d public.gestao_devices%rowtype; a public.gestao_seller_pin_attempts%rowtype; h text; n integer;
+returns boolean language plpgsql security definer set search_path=pg_catalog,pg_temp as $$
+declare d public.gestao_devices%rowtype; a public.gestao_seller_pin_attempts%rowtype; h text;
 begin
- if auth.uid() is null or p_pin !~ '^\d{6}$' then return false; end if;
+ if auth.uid() is null then raise exception 'active device authorization required' using errcode='42501'; end if;
+ if p_pin is null or p_pin !~ '^\d{6}$' then
+   select * into d from public.gestao_devices where auth_user_id=auth.uid() and active=true;
+   if not found then raise exception 'active device authorization required' using errcode='42501'; end if;
+   insert into public.gestao_seller_pin_attempts(device_id,failed_attempts,last_failed_at,updated_at) values(d.id,1,now(),now())
+   on conflict(device_id) do update set failed_attempts=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.failed_attempts when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then 1 else gestao_seller_pin_attempts.failed_attempts+1 end,last_failed_at=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.last_failed_at else now() end,updated_at=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.updated_at else now() end,blocked_until=case when gestao_seller_pin_attempts.blocked_until>now() then gestao_seller_pin_attempts.blocked_until when gestao_seller_pin_attempts.blocked_until is not null and gestao_seller_pin_attempts.blocked_until<=now() then null when gestao_seller_pin_attempts.failed_attempts+1>=5 then now()+least(interval '15 minutes',interval '30 seconds'*power(2,greatest(0,least(5,gestao_seller_pin_attempts.failed_attempts-4)))) else null end;
+   return false;
+ end if;
  select * into d from public.gestao_devices where auth_user_id=auth.uid() and active=true;
  if not found then raise exception 'active device authorization required' using errcode='42501'; end if;
  select * into a from public.gestao_seller_pin_attempts where device_id=d.id;
+ if found and a.blocked_until>now() then return false; end if;
+ select * into a from public.gestao_seller_pin_attempts where device_id=d.id;
  if found and a.blocked_until is not null and a.blocked_until>now() then return false; end if;
  select bcrypt_hash into h from public.gestao_seller_pin_credentials where business_id=d.business_id and seller_id=d.seller_id;
- if h is not null and crypt(p_pin,h)=h then
+ if h is not null and extensions.crypt(p_pin,h)=h then
    delete from public.gestao_seller_pin_attempts where device_id=d.id;
    return true;
  end if;
@@ -101,7 +113,7 @@ end $$;
 -- Online failure throttle keyed by the authenticated device. Not an online PIN
 -- verifier; malicious browser code can lie, and offline trials cannot be enforced.
 create or replace function public.gestao_note_seller_pin_failure(p_device_id uuid)
-returns void language plpgsql security definer set search_path=public,pg_temp as $$
+returns void language plpgsql security definer set search_path=pg_catalog,pg_temp as $$
 declare d public.gestao_devices%rowtype;
 begin
  select * into d from public.gestao_devices where id=p_device_id and auth_user_id=auth.uid() and active=true;
