@@ -1,0 +1,111 @@
+name: Build isolated Vendalume route forecast test APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_isolated_branch:
+        description: Type YES to confirm this dispatch is only for the isolated PIN test branch
+        required: true
+        type: string
+      confirm_production_project:
+        description: Type USE-PRODUCTION to confirm this test APK points at the production Supabase project
+        required: true
+        type: string
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/feature/pin-lock-isolated' && (github.event_name != 'workflow_dispatch' || inputs.confirm_isolated_branch == 'YES' && inputs.confirm_production_project == 'USE-PRODUCTION')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure isolated sources (publishable key only)
+        env:
+          SUPABASE_URL: ${{ secrets.VENDALUME_PIN_APPROVED_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VENDALUME_PIN_APPROVED_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_PUBLISHABLE_KEY"
+          test "$SUPABASE_URL" = 'https://zifubexfqkzlqrpjqdul.supabase.co'
+          case "$SUPABASE_PUBLISHABLE_KEY" in sb_publishable_*) ;; *) echo 'Expected public publishable key'; exit 1;; esac
+          python3 - <<'PYCFG'
+          from pathlib import Path
+          import os
+          url=os.environ['SUPABASE_URL']; key=os.environ['SUPABASE_PUBLISHABLE_KEY']
+          for name in ('index.html','gestao-runtime.js'):
+            p=Path(name); text=p.read_text()
+            text=text.replace('https://tmpbvluxjlqnglmkylfx.supabase.co',url)
+            text=text.replace('CONFIGURE_TEST_PROJECT_PUBLISHABLE_KEY',key)
+            if url not in text or key not in text: raise SystemExit(f'Could not inject config into {name}')
+            p.write_text(text)
+          PYCFG
+          python3 - <<'PYID'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import os
+          src=Path('android-project.zip'); dst=Path('android-project.pin-validation.zip')
+          with ZipFile(src) as zin, ZipFile(dst,'w',ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+              data=zin.read(item.filename)
+              if item.filename.endswith('app/build.gradle'):
+                text=data.decode()
+                old="applicationId 'com.clauber.vendasfacil'"
+                new="applicationId 'com.clauber.vendasfacil.routeforecasttest'"
+                if old not in text: raise SystemExit('Seller app id was not the expected principal ID')
+                text=text.replace(old,new,1).replace("versionCode 12","versionCode 13",1).replace("versionName '1.2.0'","versionName '1.2.0-route-test'",1); data=text.encode()
+              if item.filename.endswith('app/src/main/AndroidManifest.xml'):
+                text=data.decode().replace('android:label="Vendalume"','android:label="Vendalume Rota Teste"',1); data=text.encode()
+              zout.writestr(item,data)
+          PYID
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate embedded source scripts
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          for (const [file, external] of [['index.html', false], ['gestao-index.html', true]]) {
+            const html = fs.readFileSync(file, 'utf8');
+            const blocks = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+            for (const [i, m] of blocks.entries()) if (m[1].trim()) new Function(m[1]);
+            console.log(`${file}: ${blocks.length} script blocks syntax-checked`);
+          }
+          const seller = fs.readFileSync('index.html', 'utf8');
+          for (const token of ['sanitizeRouteForecastOrders', 'routeForecastToSaleCart', 'saveRouteForecast', 'Prever pedido', 'Previsto (não é venda)']) {
+            if (!seller.includes(token)) throw new Error(`Missing route forecast behavior: ${token}`);
+          }
+          for (const file of ['index.html']) {
+            const source = fs.readFileSync(file,'utf8');
+            if (!source.includes('https://zifubexfqkzlqrpjqdul.supabase.co') || !source.includes('sb_publishable_')) throw new Error(`${file}: approved project config missing`);
+            if (source.includes('sb_secret_') || source.includes('service_role')) throw new Error(`${file}: forbidden server secret`);
+          }
+          NODE
+      - name: Test route forecast behavior
+        run: node test-route-planner.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Android platform and Gradle
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+      - name: Build isolated seller APK from embedded feature source
+        run: |
+          mkdir seller-build && unzip -q android-project.pin-validation.zip -d seller-build
+          mkdir -p seller-build/app/src/main/assets
+          cp index.html seller-build/app/src/main/assets/index.html
+          cd seller-build && gradle --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vendalume-route-forecast-test-apks
+          path: |
+            seller-build/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
