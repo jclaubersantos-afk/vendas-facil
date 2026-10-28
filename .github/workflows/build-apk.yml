@@ -1,17 +1,12 @@
-name: Build Vendalume APK
-
-on:
-  workflow_dispatch:
-  push:
-    paths:
-      - 'android-project.zip'
-
-permissions:
-  contents: write
 name: Build isolated Vendalume PIN-lock APKs
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_isolated_branch:
+        description: Type YES to confirm this dispatch is only for the isolated PIN test branch
+        required: true
+        type: string
   push:
     branches:
       - feature/pin-lock-isolated
@@ -28,7 +23,7 @@ permissions:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/feature/pin-lock-isolated'
+    if: github.ref == 'refs/heads/feature/pin-lock-isolated' && (github.event_name != 'workflow_dispatch' || inputs.confirm_isolated_branch == 'YES')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +37,7 @@ jobs:
           for (const [file, external] of [['index.html', false], ['gestao-index.html', true]]) {
             const html = fs.readFileSync(file, 'utf8');
             if (external && !html.includes('src="./gestao-runtime.js"')) throw new Error('Manager runtime link missing');
-            const blocks = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+            const blocks = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
             for (const [i, m] of blocks.entries()) if (m[1].trim()) new Function(m[1]);
             console.log(`${file}: ${blocks.length} script blocks syntax-checked`);
           }
@@ -84,58 +79,3 @@ jobs:
             manager-build/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Check embedded JavaScript syntax
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const html = fs.readFileSync('index.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
-          if (!scripts.length) throw new Error('No embedded scripts found');
-          scripts.forEach((match, index) => new Function(match[1]));
-          console.log(`Validated ${scripts.length} embedded scripts`);
-          NODE
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: ''
-
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Install Gradle
-        run: |
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
-          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
-
-      - name: Unpack Android project
-        run: unzip -q android-project.zip -d android
-
-      - name: Build installable debug APK
-        working-directory: android
-        run: gradle --no-daemon assembleDebug
-
-      - name: Upload APK as GitHub release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: vendalume-apk-1.2.0
-          name: Vendalume APK 1.2.0
-          body: APK Vendalume versão 1.2.0, com o novo nome do aplicativo e atualização para carregar o site e os relatórios mais recentes. Mantém notificações locais, salvamento em Downloads e restauração de backup JSON.
-          prerelease: true
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
