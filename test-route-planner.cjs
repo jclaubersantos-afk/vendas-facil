@@ -88,7 +88,10 @@ assert(source.includes('widths=[80,140,190,89]'),'portrait table columns are com
 assert(source.includes("size:12,leading:27")&&source.includes('fontSize:9.5')&&source.includes('fontSize:10,height:24'),'PDF detail and totals use larger typography and spacing');
 assert(source.indexOf('Soma das quantidades previstas')<source.indexOf("pdfTableRow([['Produto'],['Quantidade total']]"),'explanatory note is above product totals table');
 assert(source.includes('Esta estimativa não registra venda nem altera estoque ou comissão.'),'PDF disclaimer remains present and below the detail table');
-assert(source.includes('shade:customerGroupIndex%2===0')&&source.includes('Math.max(18,5+10*lineCount)'),'all item rows for a customer share one shade and use compact row heights');
+assert(source.includes('shade:(report.rows.findIndex(item=>item.customerId===row.customerId)%2)===0')&&source.includes('Math.max(14,4+9*lineCount)'),'all products for one customer share a shade and use compact PDF row heights');
+assert(source.includes('noTopBorder:index>groupStart,noBottomBorder:sameNext'),'only rows inside one customer group suppress horizontal separators');
+assert(source.includes('noTopBorder:!!options.noTopBorder,noBottomBorder:!!options.noBottomBorder'),'PDF table rows accept selective internal-border suppression');
+assert(source.includes('if(!row.noTopBorder)')&&source.includes('if(!row.noBottomBorder)'),'PDF renderer omits the divider line between products belonging to one customer');
 assert(source.includes("{text:'',leading:28},{text:'TOTAIS PREVISTOS POR PRODUTO'"),'totals heading has a clear gap below the detail table');
 assert(source.includes('function openCompletedOrderFromHistory(saleId)'),'history can open an already-finalized order receipt');
 assert(source.includes("make('button','btn secondary smallbtn','Reenviar')")&&source.includes('openCompletedOrderFromHistory(s.id)'),'today and report history rows expose the re-send action');
