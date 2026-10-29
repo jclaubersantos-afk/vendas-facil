@@ -88,6 +88,11 @@ assert(source.includes('widths=[70,155,190,84]'),'portrait table columns are com
 assert(source.includes("size:12,leading:24")&&source.includes('fontSize:9.8')&&source.includes('fontSize:10,height:24'),'PDF detail and totals use larger typography and spacing');
 assert(source.indexOf('Soma das quantidades previstas')<source.indexOf("pdfTableRow([['Produto'],['Quantidade total']]"),'explanatory note is above product totals table');
 assert(source.includes('Esta estimativa não registra venda nem altera estoque ou comissão.'),'PDF disclaimer remains present and below the detail table');
+assert(source.includes('shade:customerGroupIndex%2===0')&&source.includes('Math.max(18,5+10*lineCount)'),'all item rows for a customer share one shade and use compact row heights');
+assert(source.includes("{text:'',leading:28},{text:'TOTAIS PREVISTOS POR PRODUTO'"),'totals heading has a clear gap below the detail table');
+assert(source.includes('function openCompletedOrderFromHistory(saleId)'),'history can open an already-finalized order receipt');
+assert(source.includes("make('button','btn secondary smallbtn','Reenviar')")&&source.includes('openCompletedOrderFromHistory(s.id)'),'today and report history rows expose the re-send action');
+assert(source.includes('async function shareCompletedOrderReceipt()')&&source.includes('createOrderReceiptBlob(sale)'),'old finalized order reuses the saved sale to regenerate its visual receipt');
 assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexOf('function enqueueGestaoSale(')).includes('plannedOrders'),'forecast stays outside sync payload');
 
 console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
