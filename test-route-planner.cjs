@@ -84,8 +84,8 @@ assert(pdfRows.totals.find(x=>x.productId==='water').quantity===60&&pdfRows.tota
 assert(source.includes('function routeForecastPdfLines()')&&source.includes('ITENS PREVISTOS POR CLIENTE')&&source.includes('TOTAIS PREVISTOS POR PRODUTO'),'PDF report labels and summaries are generated');
 assert(source.includes('Salvar previsão da rota em PDF')&&source.includes('saveRouteForecastPdf'),'PDF save button appears from route forecast');
 assert(source.includes("pdfBlobFromLines(routeForecastPdfLines(),'portrait')"),'route forecast PDF uses portrait orientation');
-assert(source.includes('widths=[70,155,190,84]'),'portrait table columns are compact and fit the page');
-assert(source.includes("size:12,leading:24")&&source.includes('fontSize:9.8')&&source.includes('fontSize:10,height:24'),'PDF detail and totals use larger typography and spacing');
+assert(source.includes('widths=[80,140,190,89]'),'portrait table columns are compact and fit the page');
+assert(source.includes("size:12,leading:27")&&source.includes('fontSize:9.5')&&source.includes('fontSize:10,height:24'),'PDF detail and totals use larger typography and spacing');
 assert(source.indexOf('Soma das quantidades previstas')<source.indexOf("pdfTableRow([['Produto'],['Quantidade total']]"),'explanatory note is above product totals table');
 assert(source.includes('Esta estimativa não registra venda nem altera estoque ou comissão.'),'PDF disclaimer remains present and below the detail table');
 assert(source.includes('shade:customerGroupIndex%2===0')&&source.includes('Math.max(18,5+10*lineCount)'),'all item rows for a customer share one shade and use compact row heights');
