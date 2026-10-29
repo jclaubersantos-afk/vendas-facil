@@ -43,6 +43,10 @@ assert(source.includes('function moveManualRouteStop'), 'manual stops can be reo
 const routeRenderStart=source.indexOf('function renderRouteResult(){'),routeRenderEnd=source.indexOf('function renderCustomers(){',routeRenderStart),routeRender=source.slice(routeRenderStart,routeRenderEnd);
 assert(routeRender.includes('row.append(forecastBox)')&&!routeRender.includes('box.append(forecastBox)'), 'forecast and edit control render inside the same customer card');
 assert(routeRender.indexOf('box.append(summary)')>routeRender.indexOf('ordered.forEach'), 'route-wide forecast totals render after the final customer card');
+const productRenderStart=source.indexOf('function renderProducts(){'),productRenderEnd=source.indexOf('function mapsUrl(',productRenderStart),productRender=source.slice(productRenderStart,productRenderEnd);
+assert(!productRender.includes('ordered')&&!productRender.includes('route-forecast-totals'), 'product list rendering does not depend on route-only variables');
+assert(source.includes('function renderAll(){renderHeader();renderSelects();renderDashboard();renderProducts();renderCustomers();renderRoutePlanner();'), 'full screen refresh renders product and client lists before route');
+assert(source.includes('async function importBackup()')&&source.includes('db=next;renderAll();clearCustomerForm();clearProductForm();clearExpenseForm();'), 'backup import applies and refreshes all lists after saving');
 assert(html.includes('.route-forecast-inline{')&&html.includes('border:0'), 'inline forecast has no separate surrounding card border');
 const mix=calculateRouteOrder([B,no,C],'B');
 assert(mix.ordered.map(x=>x.id).join(',')==='B,C,N', 'mixed coordinate/manual stops');
