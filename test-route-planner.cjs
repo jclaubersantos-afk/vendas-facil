@@ -85,6 +85,9 @@ assert(source.includes('function routeForecastPdfLines()')&&source.includes('ITE
 assert(source.includes('Salvar previsão da rota em PDF')&&source.includes('saveRouteForecastPdf'),'PDF save button appears from route forecast');
 assert(source.includes("pdfBlobFromLines(routeForecastPdfLines(),'portrait')"),'route forecast PDF uses portrait orientation');
 assert(source.includes('widths=[70,155,190,84]'),'portrait table columns are compact and fit the page');
+assert(source.includes("size:12,leading:24")&&source.includes('fontSize:9.8')&&source.includes('fontSize:10,height:24'),'PDF detail and totals use larger typography and spacing');
+assert(source.indexOf('Soma das quantidades previstas')<source.indexOf("pdfTableRow([['Produto'],['Quantidade total']]"),'explanatory note is above product totals table');
+assert(source.includes('Esta estimativa não registra venda nem altera estoque ou comissão.'),'PDF disclaimer remains present and below the detail table');
 assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexOf('function enqueueGestaoSale(')).includes('plannedOrders'),'forecast stays outside sync payload');
 
 console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
