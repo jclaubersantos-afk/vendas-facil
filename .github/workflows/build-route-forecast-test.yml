@@ -51,11 +51,11 @@ jobs:
               if item.filename.endswith('app/build.gradle'):
                 text=data.decode()
                 old="applicationId 'com.clauber.vendasfacil'"
-                new="applicationId 'com.clauber.vendasfacil.routeforecasttest'"
+                new="applicationId 'com.clauber.vendasfacil.routeforecasttest2'"
                 if old not in text: raise SystemExit('Seller app id was not the expected principal ID')
-                text=text.replace(old,new,1).replace("versionCode 12","versionCode 13",1).replace("versionName '1.2.0'","versionName '1.2.0-route-test'",1); data=text.encode()
+                text=text.replace(old,new,1).replace("versionCode 12","versionCode 14",1).replace("versionName '1.2.0'","versionName '1.2.0-route-resend-test'",1); data=text.encode()
               if item.filename.endswith('app/src/main/AndroidManifest.xml'):
-                text=data.decode().replace('android:label="Vendalume"','android:label="Vendalume Rota Teste"',1); data=text.encode()
+                text=data.decode().replace('android:label="Vendalume"','android:label="Vendalume Rota Reenviar"',1); data=text.encode()
               zout.writestr(item,data)
           PYID
       - uses: actions/setup-node@v4
