@@ -69,6 +69,13 @@ assert(forecasts.C.items[0].unitPrice===7.5,'forecast price refreshes from curre
 assert(routeForecastTotal(forecasts.C)===75,'forecast total is only an estimate');
 const draftCart=routeForecastToSaleCart.call(null,forecasts.C);
 assert(draftCart.length===1&&draftCart[0].total===75 && draftCart[0].unitPrice===7.5,'arrival creates editable cart draft with forecast line total');
+const routeArrivalCode=source.slice(source.indexOf('function arriveAtRouteStop(){'),source.indexOf('function advanceRouteAfterSale(',source.indexOf('function arriveAtRouteStop(){')));
+assert(routeArrivalCode.includes('saleCart=routeForecastToSaleCart(forecast)'), 'arrival loads selected stop forecast into sale draft');
+const vmContext={routeState:{orderedIds:['A','B'],currentIndex:0,plannedOrders:{A:{items:[{productId:'water',quantity:4}]},B:{items:[{productId:'cup',quantity:7}]} }},activeRouteCustomer(){return this.routeState.orderedIds[this.routeState.currentIndex]==='A'?{id:'A',name:'Client A'}:{id:'B',name:'Client B'}},routeForecastForCustomer:(orders,id)=>orders[String(id)],saleCart:[],confirm:()=>true,selectCustomerForSale(id){this.selected=id},routeForecastToSaleCart(order){return order.items.map(item=>({...item}))},renderSaleCart(){},updateSaleTotal(){},notify(){}};
+vm.runInNewContext(routeArrivalCode+'; arriveAtRouteStop();',vmContext);
+assert(vmContext.selected==='A'&&vmContext.saleCart[0].quantity===4,'first stop loads its forecast products');
+vmContext.saleCart=[];vmContext.routeState.currentIndex=1;vm.runInNewContext(routeArrivalCode+'; arriveAtRouteStop();',vmContext);
+assert(vmContext.selected==='B'&&vmContext.saleCart[0].productId==='cup'&&vmContext.saleCart[0].quantity===7,'second and later stops load their own forecast products');
 assert(!payloadCode.includes('plannedOrders')&&!payloadCode.includes('routeForecast'),'forecast never enters the Gestão sync payload');
 assert(!source.includes('delete routeState.plannedOrders[String(current.id)]'),'forecast remains for summary after completed sale');
 assert(source.includes('Salvar previsão neste aparelho')||source.includes('Previsão salva neste aparelho'),'forecast is explicitly local and not a sale');
@@ -93,9 +100,17 @@ assert(source.includes('noTopBorder:index>groupStart,noBottomBorder:sameNext'),'
 assert(source.includes('noTopBorder:!!options.noTopBorder,noBottomBorder:!!options.noBottomBorder'),'PDF table rows accept selective internal-border suppression');
 assert(source.includes('if(!row.noTopBorder)')&&source.includes('if(!row.noBottomBorder)'),'PDF renderer omits the divider line between products belonging to one customer');
 assert(source.includes("{text:'',leading:28},{text:'TOTAIS PREVISTOS POR PRODUTO'"),'totals heading has a clear gap below the detail table');
+assert(source.includes('const SALE_DATE_PREF_KEY=')&&source.includes('function preferredSaleDate()'),'chosen sale date persists across sessions');
+assert(source.includes('setSaleDate(original?preferredSaleDate():date,false)'),'saving keeps chosen load date instead of switching to today');
+assert(source.includes('Data mantida para continuar a carga. Confira antes de confirmar a venda.')&&source.includes('Usar a data de hoje'),'old chosen sale date is flagged and can be reset to today');
 assert(source.includes('function openCompletedOrderFromHistory(saleId)'),'history can open an already-finalized order receipt');
 assert(source.includes("make('button','btn secondary smallbtn','Reenviar')")&&source.includes('openCompletedOrderFromHistory(s.id)'),'today and report history rows expose the re-send action');
 assert(source.includes('async function shareCompletedOrderReceipt()')&&source.includes('createOrderReceiptBlob(sale)'),'old finalized order reuses the saved sale to regenerate its visual receipt');
 assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexOf('function enqueueGestaoSale(')).includes('plannedOrders'),'forecast stays outside sync payload');
 
+const cashPdfStart=source.indexOf('function cashClosingPdfBlob('),cashPdfEnd=source.indexOf('function offerCashCloseBackup()',cashPdfStart),cashPdfSource=source.slice(cashPdfStart,cashPdfEnd);
+assert(cashPdfSource.includes('pageWidth=595,pageHeight=842'),'daily cash close PDF uses portrait A4');
+assert(cashPdfSource.includes('UNIDADES VENDIDAS')&&cashPdfSource.includes('DESPESAS DO DIA')&&cashPdfSource.includes('FECHAMENTO FINANCEIRO')&&cashPdfSource.includes('CONTAGEM DO DINHEIRO'),'cash close PDF includes four paired summary sections');
+assert(cashPdfSource.includes("const topLeftBottom=section(leftX,ctx.y,halfWidth,'UNIDADES VENDIDAS'")&&cashPdfSource.includes("section(rightX,ctx.y,halfWidth,'DESPESAS DO DIA'")&&cashPdfSource.includes("section(leftX,secondTop,halfWidth,'FECHAMENTO FINANCEIRO'")&&cashPdfSource.includes("section(rightX,secondTop,halfWidth,'CONTAGEM DO DINHEIRO'"),'paired summary tables share consistent left and right alignment');
+assert(cashPdfSource.includes('if(ctx.y-height<margin+29){ctx=startPage')&&cashPdfSource.includes('CONTINUAÇÃO'),'daily sales continue on subsequent portrait pages');
 console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
