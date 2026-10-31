@@ -102,7 +102,7 @@ assert(source.includes('if(!row.noTopBorder)')&&source.includes('if(!row.noBotto
 assert(source.includes("{text:'',leading:28},{text:'TOTAIS PREVISTOS POR PRODUTO'"),'totals heading has a clear gap below the detail table');
 assert(source.includes('const SALE_DATE_PREF_KEY=')&&source.includes('function preferredSaleDate()'),'chosen sale date persists across sessions');
 assert(source.includes('setSaleDate(original?preferredSaleDate():date,false)'),'saving keeps chosen load date instead of switching to today');
-assert(source.includes('Data mantida para continuar a carga. Confira antes de confirmar a venda.')&&source.includes('Usar a data de hoje'),'old chosen sale date is flagged and can be reset to today');
+assert(source.includes('Data mantida para continuar a carga. Confira antes de confirmar a venda.')&&html.includes('Usar a data de hoje'),'old chosen sale date is flagged and can be reset to today');
 assert(source.includes('function openCompletedOrderFromHistory(saleId)'),'history can open an already-finalized order receipt');
 assert(source.includes("make('button','btn secondary smallbtn','Reenviar')")&&source.includes('openCompletedOrderFromHistory(s.id)'),'today and report history rows expose the re-send action');
 assert(source.includes('async function shareCompletedOrderReceipt()')&&source.includes('createOrderReceiptBlob(sale)'),'old finalized order reuses the saved sale to regenerate its visual receipt');
@@ -111,6 +111,6 @@ assert(!source.slice(source.indexOf('function buildGestaoOutbox('),source.indexO
 const cashPdfStart=source.indexOf('function cashClosingPdfBlob('),cashPdfEnd=source.indexOf('function offerCashCloseBackup()',cashPdfStart),cashPdfSource=source.slice(cashPdfStart,cashPdfEnd);
 assert(cashPdfSource.includes('pageWidth=595,pageHeight=842'),'daily cash close PDF uses portrait A4');
 assert(cashPdfSource.includes('UNIDADES VENDIDAS')&&cashPdfSource.includes('DESPESAS DO DIA')&&cashPdfSource.includes('FECHAMENTO FINANCEIRO')&&cashPdfSource.includes('CONTAGEM DO DINHEIRO'),'cash close PDF includes four paired summary sections');
-assert(cashPdfSource.includes("const topLeftBottom=section(leftX,ctx.y,halfWidth,'UNIDADES VENDIDAS'")&&cashPdfSource.includes("section(rightX,ctx.y,halfWidth,'DESPESAS DO DIA'")&&cashPdfSource.includes("section(leftX,secondTop,halfWidth,'FECHAMENTO FINANCEIRO'")&&cashPdfSource.includes("section(rightX,secondTop,halfWidth,'CONTAGEM DO DINHEIRO'"),'paired summary tables share consistent left and right alignment');
+assert(cashPdfSource.includes("drawPairedSections('UNIDADES VENDIDAS',unitRows,'DESPESAS DO DIA',expenseRows)")&&cashPdfSource.includes("drawPairedSections('FECHAMENTO FINANCEIRO',financeRows,'CONTAGEM DO DINHEIRO',countRows)"),'aligned paired summary tables');
 assert(cashPdfSource.includes('if(ctx.y-height<margin+29){ctx=startPage')&&cashPdfSource.includes('CONTINUAÇÃO'),'daily sales continue on subsequent portrait pages');
 console.log('Route planner tests passed: route ordering, map links, persistence, per-stop forecast, arrival draft loading, all-stop product totals, and no sync leakage.');
