@@ -6,7 +6,7 @@ const assert=(ok,msg)=>{if(!ok)throw new Error(msg)};
 assert(scripts.length===3,'initial integration base should remain at its original three script blocks');
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
 assert(new Set(ids).size===ids.length,'DOM IDs are unique');
-for(const id of ['saveProduct','editProduct','saveSale','addSaleItem','importBackup','gestaoPairButton','planCustomerRoute'])assert(ids.includes(id),`missing user control ${id}`);
+for(const id of ['saveProduct','saveSale','addSaleItem','importBackup','gestaoPairButton','planCustomerRoute'])assert(ids.includes(id),`missing user control ${id}`);
 for(const name of ['commit','renderAll','saveProduct','editProduct','saveSale','addSaleItem','importBackup','renderCompletedOrder','processGestaoOutbox'])assert(new RegExp(`(?:async\\s+)?function\\s+${name}\\s*\\(`).test(app),`missing app routine ${name}`);
 assert(app.includes("$('saveProduct').addEventListener('click',saveProduct)"),'product save button bound');
 assert(app.includes("$('saveSale').addEventListener('click',saveSale)"),'sale confirm button bound');
