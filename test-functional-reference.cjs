@@ -9,7 +9,7 @@ const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert(new Set(ids).size===ids.length,'Duplicate HTML IDs');
 const tabs=[...html.matchAll(/<button\b[^>]*class="tab(?:\s+active)?"[^>]*data-tab="([^"]+)"[^>]*>/g)].map(x=>x[1]);
 assert(tabs.length>=5,`Expected navigation buttons, found ${tabs.length}`);
-for(const id of tabs)assert(new RegExp(`<[^>]+id="${id}"[^>]*class="panel(?:\s+active)?"`).test(html),`Missing panel for tab ${id}`);
+for(const id of tabs)assert(new RegExp(`<[^>]+id="${id}"[^>]*class="panel(?:\\s+active)?"`).test(html),`Missing panel for tab ${id}`);
 assert(/document\.querySelectorAll\('\.tab'\)\.forEach\(button=>button\.addEventListener\('click',\(\)=>changeTab\(button\.dataset\.tab\)\)\)/.test(app),'Tab click listeners are not attached');
 assert(/function changeTab\(id\)\{document\.querySelectorAll\('\.tab'\)/.test(app),'Tab state transition function is missing');
 for(const fn of ['saveProduct','saveSale','importBackup','saveReportPdf','saveDailyClosingPdf'])assert(new RegExp(`(?:async\\s+)?function\\s+${fn}\\s*\\(`).test(app),`Missing ${fn}`);
