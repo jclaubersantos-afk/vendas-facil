@@ -1,0 +1,87 @@
+name: Build isolated Vendalume restart baseline APK
+
+on:
+  push:
+    branches:
+      - restart/vendalume-integration-clean
+    paths:
+      - 'index.html'
+      - 'vendalume-restart-baseline-wrapper.zip'
+      - 'test-restart-baseline.cjs'
+      - 'test-restart-baseline-route.cjs'
+      - '.github/workflows/build-restart-baseline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated restart branch
+        uses: actions/checkout@v4
+        with:
+          ref: restart/vendalume-integration-clean
+
+      - name: Validate baseline JavaScript
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (scripts.length !== 3) throw new Error(`Expected three baseline scripts, got ${scripts.length}`);
+          scripts.forEach((m, i) => { if (m[1].trim()) new Function(m[1]); });
+          for (const token of ['gestaoPairButton','gestao_claim_pairing_code','gestao_sync_sale','__gestaoSyncOutbox','__gestaoSyncAcknowledgements','function saveProduct(){','function saveSale(){','function importBackup(){']) {
+            if (!html.includes(token)) throw new Error(`Missing baseline feature: ${token}`);
+          }
+          if (html.includes('routeState is not defined')) throw new Error('Out-of-scope routeState reference detected');
+          if (html.includes('com.clauber.vendasfacil.restartbaseline')) throw new Error('Android application ID must not appear in the HTML');
+          console.log(`Validated ${scripts.length} baseline scripts and sale/product/backup/Gestão features`);
+          NODE
+
+      - name: Run baseline route regression suite
+        run: node test-restart-baseline-route.cjs
+
+      - name: Run baseline sale/product/backup checks
+        run: node test-restart-baseline.cjs
+
+      - name: Prepare isolated baseline Android wrapper
+        run: |
+          mkdir android
+          unzip -q vendalume-restart-baseline-wrapper.zip -d android
+          mkdir -p android/app/src/main/assets
+          cp index.html android/app/src/main/assets/index.html
+          grep -q "applicationId 'com.clauber.vendasfacil.restartbaseline'" android/app/build.gradle
+          grep -q 'https://appassets.androidplatform.net/assets/index.html' android/app/src/main/java/com/clauber/vendasfacil/restartbaseline/MainActivity.java
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android SDK platform and build tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Build isolated restart baseline APK
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload temporary baseline artifact only
+        uses: actions/upload-artifact@v4
+        with:
+          name: vendalume-restart-baseline-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
